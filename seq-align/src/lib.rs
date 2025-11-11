@@ -1,7 +1,7 @@
+use ndarray::{Array1, Array2};
+use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
-use numpy::{PyReadonlyArray2};
-use ndarray::{Array1, Array2};
 
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -44,10 +44,10 @@ impl AlignFrag {
     }
 
     fn __eq__(&self, other: &Self) -> bool {
-        self.frag_type == other.frag_type &&
-        self.sa_start == other.sa_start &&
-        self.sb_start == other.sb_start &&
-        self.len == other.len
+        self.frag_type == other.frag_type
+            && self.sa_start == other.sa_start
+            && self.sb_start == other.sb_start
+            && self.len == other.len
     }
 }
 
@@ -96,7 +96,6 @@ impl Direction {
     }
 }
 
-
 fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
@@ -133,7 +132,10 @@ fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if !matches!(dir_matrix[[s_col as usize, s_row as usize]].kind(), DirectionKind::Match) {
+                    if !matches!(
+                        dir_matrix[[s_col as usize, s_row as usize]].kind(),
+                        DirectionKind::Match
+                    ) {
                         break;
                     }
                 }
@@ -149,11 +151,7 @@ fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<
     result
 }
 
-fn global_traceback(
-    dir_matrix: &Array2<Direction>,
-    s_col: usize,
-    s_row: usize,
-) -> Vec<AlignFrag> {
+fn global_traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
@@ -189,7 +187,10 @@ fn global_traceback(
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if !matches!(dir_matrix[[s_col as usize, s_row as usize]].kind(), DirectionKind::Match) {
+                    if !matches!(
+                        dir_matrix[[s_col as usize, s_row as usize]].kind(),
+                        DirectionKind::Match
+                    ) {
                         break;
                     }
                 }
@@ -224,7 +225,6 @@ fn global_traceback(
     result
 }
 
-
 #[pyfunction]
 fn local_align(
     seqa: &[u8],
@@ -246,21 +246,28 @@ fn local_align(
         ));
     }
 
-    let mut curr_score = Array1::zeros(sb_len);
-    let mut prev_score = Array1::zeros(sb_len);
+    let curr_score = Array1::uninit(sb_len);
+    let mut prev_score = Array1::uninit(sb_len);
     let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::zeros(sb_len);
-    let mut hgap_score = Array1::zeros(sb_len);
+    let mut hgap_pos = Array1::uninit(sb_len);
+    let mut hgap_score = Array1::uninit(sb_len);
 
     let mut max_score = 0;
     let mut max_row = 0;
     let mut max_col = 0;
 
     for row in 0..sb_len {
-        hgap_pos[row] = -1;
-        hgap_score[row] = gap_open;
-        prev_score[row] = 0;
+        hgap_pos[row].write(-1);
+        hgap_score[row].write(gap_open);
+        prev_score[row].write(0);
     }
+
+    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
+    let mut prev_score = unsafe { prev_score.assume_init() };
+    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
+    let mut hgap_score = unsafe { hgap_score.assume_init() };
+    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
+    let mut curr_score = unsafe { curr_score.assume_init() };
 
     for col in 0..sa_len {
         let mut vgap_pos = -1;
@@ -388,17 +395,25 @@ fn global_align(
         ));
     }
 
-    let mut curr_score = Array1::zeros(sb_len);
-    let mut prev_score = Array1::zeros(sb_len);
+    let curr_score = Array1::uninit(sb_len);
+    let mut prev_score = Array1::uninit(sb_len);
     let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::zeros(sb_len);
-    let mut hgap_score = Array1::zeros(sb_len);
+    let mut hgap_pos = Array1::uninit(sb_len);
+    let mut hgap_score = Array1::uninit(sb_len);
 
     for row in 0..sb_len {
-        prev_score[row] = gap_open + gap_extend * row as i32;
-        hgap_pos[row] = -1;
-        hgap_score[row] = prev_score[row] + gap_open;
+        let score = gap_open + gap_extend * row as i32;
+        prev_score[row].write(score);
+        hgap_pos[row].write(-1);
+        hgap_score[row].write(score + gap_open);
     }
+
+    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
+    let mut prev_score = unsafe { prev_score.assume_init() };
+    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
+    let mut hgap_score = unsafe { hgap_score.assume_init() };
+    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
+    let mut curr_score = unsafe { curr_score.assume_init() };
 
     for col in 0..sa_len {
         let mut vgap_pos = -1;
@@ -508,21 +523,28 @@ fn glocal_align(
         ));
     }
 
-    let mut curr_score = Array1::zeros(sb_len);
-    let mut prev_score = Array1::zeros(sb_len);
+    let curr_score = Array1::uninit(sb_len);
+    let mut prev_score = Array1::uninit(sb_len);
     let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::zeros(sb_len);
-    let mut hgap_score = Array1::zeros(sb_len);
+    let mut hgap_pos = Array1::uninit(sb_len);
+    let mut hgap_score = Array1::uninit(sb_len);
 
     let mut max_score = 0;
     let mut max_row = 0;
     let mut max_col = 0;
 
     for row in 0..sb_len {
-        prev_score[row] = std::i32::MIN / 2;
-        hgap_pos[row] = -1;
-        hgap_score[row] = std::i32::MIN / 2;
+        prev_score[row].write(std::i32::MIN / 2);
+        hgap_pos[row].write(-1);
+        hgap_score[row].write(std::i32::MIN / 2);
     }
+
+    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
+    let mut prev_score = unsafe { prev_score.assume_init() };
+    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
+    let mut hgap_score = unsafe { hgap_score.assume_init() };
+    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
+    let mut curr_score = unsafe { curr_score.assume_init() };
 
     for col in 0..sa_len {
         let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
@@ -613,30 +635,36 @@ fn overlap_align(
         ));
     }
 
-    let mut curr_score = Array1::zeros(sb_len);
-    let mut prev_score = Array1::zeros(sb_len);
+    let curr_score = Array1::uninit(sb_len);
+    let mut prev_score = Array1::uninit(sb_len);
     let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::zeros(sb_len);
-    let mut hgap_score = Array1::zeros(sb_len);
+    let mut hgap_pos = Array1::uninit(sb_len);
+    let mut hgap_score = Array1::uninit(sb_len);
 
     let mut max_score = std::i32::MIN;
     let mut max_row = -1;
     let mut max_col = -1;
 
     for row in 0..sb_len {
-        curr_score[row] = score_matrix[[sa[0] as usize, sb[row] as usize]];
-        hgap_pos[row] = 0;
-        hgap_score[row] = curr_score[row] + gap_open;
+        let score = score_matrix[[sa[0] as usize, sb[row] as usize]];
+        prev_score[row].write(score);
+        hgap_pos[row].write(0);
+        hgap_score[row].write(score + gap_open);
         dir_matrix[[0, row]].write(Direction::MATCH);
     }
 
-    if curr_score[sb_len - 1] >= max_score {
+    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
+    let mut prev_score = unsafe { prev_score.assume_init() };
+    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
+    let mut hgap_score = unsafe { hgap_score.assume_init() };
+    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
+    let mut curr_score = unsafe { curr_score.assume_init() };
+
+    if prev_score[sb_len - 1] >= max_score {
         max_row = sb_len as i32 - 1;
         max_col = 0;
-        max_score = curr_score[sb_len - 1];
+        max_score = prev_score[sb_len - 1];
     }
-
-    std::mem::swap(&mut curr_score, &mut prev_score);
 
     for col in 1..sa_len - 1 {
         let mut score;
@@ -669,26 +697,24 @@ fn overlap_align(
             if !is_gap_a && score + gap_open >= vgap_score + gap_extend {
                 vgap_score = score + gap_open;
                 vgap_pos = row as i32;
-            }
-            else {
+            } else {
                 vgap_score += gap_extend;
             }
 
-            let is_gap_b =  matches!(dir.kind(), DirectionKind::GapB(_));
+            let is_gap_b = matches!(dir.kind(), DirectionKind::GapB(_));
 
             if !is_gap_b && score + gap_open >= hgap_score[row] + gap_extend {
                 hgap_score[row] = score + gap_open;
                 hgap_pos[row] = col as i32;
-            }
-            else {
+            } else {
                 hgap_score[row] += gap_extend;
             }
         }
-
-        if curr_score[sb_len - 1] >= max_score {
+        let last_row_score = curr_score[sb_len - 1];
+        if last_row_score >= max_score {
             max_row = sb_len as i32 - 1;
             max_col = col as i32;
-            max_score = curr_score[sb_len - 1];
+            max_score = last_row_score;
         }
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
@@ -756,11 +782,7 @@ fn overlap_align(
 
     // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(
-        &dir_matrix,
-        final_max_col,
-        final_max_row,
-    );
+    let align_frag = traceback(&dir_matrix, final_max_col, final_max_row);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
