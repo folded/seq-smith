@@ -132,9 +132,7 @@ fn traceback(dir_matrix: &[Direction], sb_len: usize, s_col: usize, s_row: usize
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if let DirectionKind::Match = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind() {
-                        // continue
-                    } else {
+                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
                         break;
                     }
                 }
@@ -191,9 +189,7 @@ fn global_traceback(
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if let DirectionKind::Match = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind() {
-                        // continue
-                    } else {
+                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
                         break;
                     }
                 }
@@ -657,10 +653,7 @@ fn overlap_align(
             curr_score[row] = score;
             dir_matrix[col * sb_len + row] = dir;
 
-            let is_gap_a = match dir.kind() {
-                DirectionKind::GapA(_) => true,
-                _ => false,
-            };
+            let is_gap_a = matches!(dir.kind(), DirectionKind::GapA(_));
 
             if !is_gap_a && score + gap_open >= vgap_score + gap_extend {
                 vgap_score = score + gap_open;
@@ -670,10 +663,7 @@ fn overlap_align(
                 vgap_score += gap_extend;
             }
 
-            let is_gap_b = match dir.kind() {
-                DirectionKind::GapB(_) => true,
-                _ => false,
-            };
+            let is_gap_b =  matches!(dir.kind(), DirectionKind::GapB(_));
 
             if !is_gap_b && score + gap_open >= hgap_score[row] + gap_extend {
                 hgap_score[row] = score + gap_open;
