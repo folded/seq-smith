@@ -121,9 +121,13 @@ def glocal_test_data() -> AlignmentInput:
     )
 
 
-def test_global_align_simple(common_data) -> None:
+def test_global_align_simple(common_data: AlignmentInput) -> None:
     alignment = global_align(
-        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+        common_data.seqa,
+        common_data.seqb,
+        common_data.score_matrix,
+        common_data.gap_open,
+        common_data.gap_extend,
     )
 
     assert alignment.score == 0
@@ -134,7 +138,7 @@ def test_global_align_simple(common_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_global_align_simple_gap(common_data) -> None:
+def test_global_align_simple_gap(common_data: AlignmentInput) -> None:
     seqa = common_data.encode("A")
     seqb = common_data.encode("AC")
     alignment = global_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
@@ -148,9 +152,13 @@ def test_global_align_simple_gap(common_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_glocal_align_simple(common_data) -> None:
+def test_glocal_align_simple(common_data: AlignmentInput) -> None:
     alignment = glocal_align(
-        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+        common_data.seqa,
+        common_data.seqb,
+        common_data.score_matrix,
+        common_data.gap_open,
+        common_data.gap_extend,
     )
 
     assert alignment.score == 0
@@ -161,7 +169,7 @@ def test_glocal_align_simple(common_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_glocal_align_subsegment_global_seqb(glocal_test_data) -> None:
+def test_glocal_align_subsegment_global_seqb(glocal_test_data: AlignmentInput) -> None:
     alignment = glocal_align(
         glocal_test_data.seqa,
         glocal_test_data.seqb,
@@ -179,9 +187,13 @@ def test_glocal_align_subsegment_global_seqb(glocal_test_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_overlap_align_simple(common_data) -> None:
+def test_overlap_align_simple(common_data: AlignmentInput) -> None:
     alignment = overlap_align(
-        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+        common_data.seqa,
+        common_data.seqb,
+        common_data.score_matrix,
+        common_data.gap_open,
+        common_data.gap_extend,
     )
 
     assert alignment.score == 0
@@ -193,7 +205,7 @@ def test_overlap_align_simple(common_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_overlap_align_semi_global_overlap(common_data) -> None:
+def test_overlap_align_semi_global_overlap(common_data: AlignmentInput) -> None:
     seqa = common_data.encode("ACGTACGT")
     seqb = common_data.encode("CGTA")
     alignment = overlap_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
@@ -255,13 +267,16 @@ def test_local_align_perfect_match_subsegment() -> None:
     assert alignment.frag_count == 1
     expected_frags = [
         AlignFrag(
-            frag_type=FragType.Match, sa_start=5, sb_start=3, len=4,
+            frag_type=FragType.Match,
+            sa_start=5,
+            sb_start=3,
+            len=4,
         ),  # AGCT in seqa starts at index 5, in seqb at index 3
     ]
     assert alignment.align_frag == expected_frags
 
 
-def test_local_align_multi_fragment(multi_fragment_data) -> None:
+def test_local_align_multi_fragment(multi_fragment_data: AlignmentInput) -> None:
     alignment = local_align(
         multi_fragment_data.seqa,
         multi_fragment_data.seqb,
@@ -281,7 +296,7 @@ def test_local_align_multi_fragment(multi_fragment_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_global_align_multi_fragment(multi_fragment_data) -> None:
+def test_global_align_multi_fragment(multi_fragment_data: AlignmentInput) -> None:
     alignment = global_align(
         multi_fragment_data.seqa,
         multi_fragment_data.seqb,
@@ -304,7 +319,7 @@ def test_global_align_multi_fragment(multi_fragment_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_glocal_align_multi_fragment(multi_fragment_data) -> None:
+def test_glocal_align_multi_fragment(multi_fragment_data: AlignmentInput) -> None:
     alignment = glocal_align(
         multi_fragment_data.seqa,
         multi_fragment_data.seqb,
@@ -326,7 +341,7 @@ def test_glocal_align_multi_fragment(multi_fragment_data) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_overlap_align_multi_fragment(multi_fragment_data) -> None:
+def test_overlap_align_multi_fragment(multi_fragment_data: AlignmentInput) -> None:
     alignment = overlap_align(
         multi_fragment_data.seqa,
         multi_fragment_data.seqb,
@@ -347,41 +362,41 @@ def test_overlap_align_multi_fragment(multi_fragment_data) -> None:
 
 
 # Test with empty sequences
-def test_local_align_empty_seqa(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_local_align_empty_seqa(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         local_align(b"", common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_local_align_empty_seqb(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_local_align_empty_seqb(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         local_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_global_align_empty_seqa(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_global_align_empty_seqa(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         global_align(b"", common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_global_align_empty_seqb(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_global_align_empty_seqb(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         global_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_glocal_align_empty_seqa(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_glocal_align_empty_seqa(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         glocal_align(b"", common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_glocal_align_empty_seqb(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_glocal_align_empty_seqb(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         glocal_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_overlap_align_empty_seqa(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_overlap_align_empty_seqa(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         overlap_align(b"", common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
 
-def test_overlap_align_empty_seqb(common_data) -> None:
-    with pytest.raises(ValueError, match="Input sequences cannot be empty."):
+def test_overlap_align_empty_seqb(common_data: AlignmentInput) -> None:
+    with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         overlap_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
