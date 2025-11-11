@@ -137,3 +137,7 @@ dmypy.json
 
 # IDE
 .vscode
+
+# Rust / Cargo
+**/Cargo.lock
+**/target/
