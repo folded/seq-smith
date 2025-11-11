@@ -35,6 +35,7 @@ class AlignFrag:
             f"sb_start={self.sb_start}, hsp_len={self.hsp_len})"
         )
 
+
 class Alignment:
     def __init__(self, score, frag_count, align_frag) -> None:
         self.score = score
@@ -50,10 +51,8 @@ class Alignment:
         )
 
     def __repr__(self) -> str:
-        return (
-            f"Alignment(score={self.score}, frag_count={self.frag_count}, "
-            f"align_frag={self.align_frag})"
-        )
+        return f"Alignment(score={self.score}, frag_count={self.frag_count}, align_frag={self.align_frag})"
+
 
 def convert_c_alignment_to_py_alignment(c_alignment_ptr):
     if not c_alignment_ptr:
@@ -82,6 +81,7 @@ def convert_c_alignment_to_py_alignment(c_alignment_ptr):
 
     return Alignment(score, frag_count, py_align_frags)
 
+
 # Fixtures from test_seq_align.py
 @pytest.fixture
 def common_data():
@@ -102,6 +102,7 @@ def common_data():
     gap_open = -2
     gap_extend = -1
     return seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend
+
 
 @pytest.fixture
 def multi_fragment_data():
@@ -124,14 +125,17 @@ def multi_fragment_data():
     gap_extend = -1
     return seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend
 
+
 # Test functions
 def test_c_local_align_simple(common_data) -> None:
     seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend = common_data
 
     c_score_matrix = score_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
     c_alignment_ptr = lib.local_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -146,14 +150,17 @@ def test_c_local_align_simple(common_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 def test_c_global_align_simple(common_data) -> None:
     seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend = common_data
 
     c_score_matrix = score_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
 
     c_alignment_ptr = lib.global_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -167,6 +174,7 @@ def test_c_global_align_simple(common_data) -> None:
         AlignFrag(frag_type=FragType.MATCH, sa_start=0, sb_start=0, hsp_len=4),
     ]
     assert alignment.align_frag == expected_frags
+
 
 def test_c_glocal_align_simple(common_data) -> None:
     seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend = common_data
@@ -174,8 +182,10 @@ def test_c_glocal_align_simple(common_data) -> None:
     c_score_matrix = score_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
 
     c_alignment_ptr = lib.glocal_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -189,6 +199,7 @@ def test_c_glocal_align_simple(common_data) -> None:
         AlignFrag(frag_type=FragType.MATCH, sa_start=0, sb_start=0, hsp_len=4),
     ]
     assert alignment.align_frag == expected_frags
+
 
 def test_c_align_simple(common_data) -> None:
     seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend = common_data
@@ -196,8 +207,10 @@ def test_c_align_simple(common_data) -> None:
     c_score_matrix = score_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
 
     c_alignment_ptr = lib.overlap_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -212,14 +225,17 @@ def test_c_align_simple(common_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 def test_c_local_align_multi_fragment(multi_fragment_data) -> None:
     seqa, seqb, alpha_len, score_matrix, gap_open, gap_extend = multi_fragment_data
 
     c_score_matrix = score_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
 
     c_alignment_ptr = lib.local_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -238,6 +254,7 @@ def test_c_local_align_multi_fragment(multi_fragment_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 def test_c_global_align_multi_fragment(multi_fragment_data) -> None:
     seqa, seqb, _map_bytes, score_matrix, gap_open, gap_extend = multi_fragment_data
 
@@ -245,8 +262,10 @@ def test_c_global_align_multi_fragment(multi_fragment_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.global_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -268,6 +287,7 @@ def test_c_global_align_multi_fragment(multi_fragment_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 def test_c_glocal_align_multi_fragment(multi_fragment_data) -> None:
     seqa, seqb, _map_bytes, score_matrix, gap_open, gap_extend = multi_fragment_data
 
@@ -275,8 +295,10 @@ def test_c_glocal_align_multi_fragment(multi_fragment_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.glocal_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -297,6 +319,7 @@ def test_c_glocal_align_multi_fragment(multi_fragment_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 def test_c_align_multi_fragment(multi_fragment_data) -> None:
     seqa, seqb, _map_bytes, score_matrix, gap_open, gap_extend = multi_fragment_data
 
@@ -304,8 +327,10 @@ def test_c_align_multi_fragment(multi_fragment_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.overlap_align(
-        seqa, len(seqa),
-        seqb, len(seqb),
+        seqa,
+        len(seqa),
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -324,6 +349,7 @@ def test_c_align_multi_fragment(multi_fragment_data) -> None:
     ]
     assert alignment.align_frag == expected_frags
 
+
 # Test with empty sequences (expecting ValueError from Python wrapper, not C)
 def test_c_local_align_empty_seqa(common_data) -> None:
     _, seqb, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -335,8 +361,10 @@ def test_c_local_align_empty_seqa(common_data) -> None:
     # For now, we'll check if it returns NULL or if the score is unexpected.
     # The original Python test expects ValueError, so we'll adapt.
     c_alignment_ptr = lib.local_align(
-        b"", 0,
-        seqb, len(seqb),
+        b"",
+        0,
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -354,8 +382,10 @@ def test_c_local_align_empty_seqb(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.local_align(
-        seqa, len(seqa),
-        b"", 0,
+        seqa,
+        len(seqa),
+        b"",
+        0,
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -363,6 +393,7 @@ def test_c_local_align_empty_seqb(common_data) -> None:
     )
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
+
 
 def test_c_global_align_empty_seqa(common_data) -> None:
     _, seqb, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -371,8 +402,10 @@ def test_c_global_align_empty_seqa(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.global_align(
-        b"", 0,
-        seqb, len(seqb),
+        b"",
+        0,
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -380,6 +413,7 @@ def test_c_global_align_empty_seqa(common_data) -> None:
     )
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
+
 
 def test_c_global_align_empty_seqb(common_data) -> None:
     seqa, _, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -388,8 +422,10 @@ def test_c_global_align_empty_seqb(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.global_align(
-        seqa, len(seqa),
-        b"", 0,
+        seqa,
+        len(seqa),
+        b"",
+        0,
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -397,6 +433,7 @@ def test_c_global_align_empty_seqb(common_data) -> None:
     )
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
+
 
 def test_c_glocal_align_empty_seqa(common_data) -> None:
     _, seqb, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -405,8 +442,10 @@ def test_c_glocal_align_empty_seqa(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.glocal_align(
-        b"", 0,
-        seqb, len(seqb),
+        b"",
+        0,
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -414,6 +453,7 @@ def test_c_glocal_align_empty_seqa(common_data) -> None:
     )
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
+
 
 def test_c_glocal_align_empty_seqb(common_data) -> None:
     seqa, _, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -422,8 +462,10 @@ def test_c_glocal_align_empty_seqb(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.glocal_align(
-        seqa, len(seqa),
-        b"", 0,
+        seqa,
+        len(seqa),
+        b"",
+        0,
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -431,6 +473,7 @@ def test_c_glocal_align_empty_seqb(common_data) -> None:
     )
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
+
 
 def test_c_align_empty_seqa(common_data) -> None:
     _, seqb, _map_bytes, score_matrix, gap_open, gap_extend = common_data
@@ -439,8 +482,10 @@ def test_c_align_empty_seqa(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.overlap_align(
-        b"", 0,
-        seqb, len(seqb),
+        b"",
+        0,
+        seqb,
+        len(seqb),
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -449,6 +494,7 @@ def test_c_align_empty_seqa(common_data) -> None:
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
 
+
 def test_c_align_empty_seqb(common_data) -> None:
     seqa, _, alpha_len, score_matrix, gap_open, gap_extend = common_data
 
@@ -456,8 +502,10 @@ def test_c_align_empty_seqb(common_data) -> None:
     alpha_len = score_matrix.shape[0]
 
     c_alignment_ptr = lib.overlap_align(
-        seqa, len(seqa),
-        b"", 0,
+        seqa,
+        len(seqa),
+        b"",
+        0,
         alpha_len,
         c_score_matrix,
         gap_open,
@@ -481,9 +529,11 @@ def test_local_align_perfect_match_subsegment() -> None:
 
     alignment = lib.local_align(seqa, len(seqa), seqb, len(seqb), 8, c_score_matrix, gap_open, gap_extend)
     alignment = convert_c_alignment_to_py_alignment(alignment)
-    assert alignment.score == 4 # AGCT match
+    assert alignment.score == 4  # AGCT match
     assert alignment.frag_count == 1
     expected_frags = [
-        AlignFrag(frag_type=FragType.MATCH, sa_start=5, sb_start=3, hsp_len=4), # AGCT in seqa starts at index 5, in seqb at index 3
+        AlignFrag(
+            frag_type=FragType.MATCH, sa_start=5, sb_start=3, hsp_len=4,
+        ),  # AGCT in seqa starts at index 5, in seqb at index 3
     ]
     assert alignment.align_frag == expected_frags

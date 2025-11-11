@@ -71,10 +71,10 @@ def complex_data() -> AlignmentInput:
 
     score_matrix = np.array(
         [
-            [ 2, -1, -1, -1],
-            [-1,  2, -1, -1],
-            [-1, -1,  2, -1],
-            [-1, -1, -1,  2],
+            [2, -1, -1, -1],
+            [-1, 2, -1, -1],
+            [-1, -1, 2, -1],
+            [-1, -1, -1, 2],
         ],
         dtype=np.int32,
     )
@@ -100,11 +100,11 @@ def glocal_test_data() -> AlignmentInput:
 
     score_matrix = np.array(
         [
-            [1, -1, -1, -1, -1], # A
-            [-1, 1, -1, -1, -1], # C
-            [-1, -1, 1, -1, -1], # G
-            [-1, -1, -1, 1, -1], # T
-            [-1, -1, -1, -1, 0], # X
+            [1, -1, -1, -1, -1],  # A
+            [-1, 1, -1, -1, -1],  # C
+            [-1, -1, 1, -1, -1],  # G
+            [-1, -1, -1, 1, -1],  # T
+            [-1, -1, -1, -1, 0],  # X
         ],
         dtype=np.int32,
     )
@@ -122,7 +122,9 @@ def glocal_test_data() -> AlignmentInput:
 
 
 def test_global_align_simple(common_data) -> None:
-    alignment = global_align(common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+    alignment = global_align(
+        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+    )
 
     assert alignment.score == 0
     assert alignment.frag_count == 1
@@ -147,7 +149,9 @@ def test_global_align_simple_gap(common_data) -> None:
 
 
 def test_glocal_align_simple(common_data) -> None:
-    alignment = glocal_align(common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+    alignment = glocal_align(
+        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+    )
 
     assert alignment.score == 0
     assert alignment.frag_count == 1
@@ -158,7 +162,13 @@ def test_glocal_align_simple(common_data) -> None:
 
 
 def test_glocal_align_subsegment_global_seqb(glocal_test_data) -> None:
-    alignment = glocal_align(glocal_test_data.seqa, glocal_test_data.seqb, glocal_test_data.score_matrix, glocal_test_data.gap_open, glocal_test_data.gap_extend)
+    alignment = glocal_align(
+        glocal_test_data.seqa,
+        glocal_test_data.seqb,
+        glocal_test_data.score_matrix,
+        glocal_test_data.gap_open,
+        glocal_test_data.gap_extend,
+    )
 
     assert alignment.score == 4
     assert alignment.frag_count == 1
@@ -170,7 +180,9 @@ def test_glocal_align_subsegment_global_seqb(glocal_test_data) -> None:
 
 
 def test_overlap_align_simple(common_data) -> None:
-    alignment = overlap_align(common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+    alignment = overlap_align(
+        common_data.seqa, common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend,
+    )
 
     assert alignment.score == 0
     assert alignment.frag_count == 1
@@ -239,16 +251,24 @@ def test_local_align_perfect_match_subsegment() -> None:
     gap_extend = -1
 
     alignment = local_align(seqa, seqb, score_matrix, gap_open, gap_extend)
-    assert alignment.score == 4 # AGCT match
+    assert alignment.score == 4  # AGCT match
     assert alignment.frag_count == 1
     expected_frags = [
-        AlignFrag(frag_type=FragType.Match, sa_start=5, sb_start=3, len=4), # AGCT in seqa starts at index 5, in seqb at index 3
+        AlignFrag(
+            frag_type=FragType.Match, sa_start=5, sb_start=3, len=4,
+        ),  # AGCT in seqa starts at index 5, in seqb at index 3
     ]
     assert alignment.align_frag == expected_frags
 
 
 def test_local_align_multi_fragment(multi_fragment_data) -> None:
-    alignment = local_align(multi_fragment_data.seqa, multi_fragment_data.seqb, multi_fragment_data.score_matrix, multi_fragment_data.gap_open, multi_fragment_data.gap_extend)
+    alignment = local_align(
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        multi_fragment_data.score_matrix,
+        multi_fragment_data.gap_open,
+        multi_fragment_data.gap_extend,
+    )
     assert alignment.score == 4
     assert alignment.frag_count == 5
     expected_frags = [
@@ -262,7 +282,13 @@ def test_local_align_multi_fragment(multi_fragment_data) -> None:
 
 
 def test_global_align_multi_fragment(multi_fragment_data) -> None:
-    alignment = global_align(multi_fragment_data.seqa, multi_fragment_data.seqb, multi_fragment_data.score_matrix, multi_fragment_data.gap_open, multi_fragment_data.gap_extend)
+    alignment = global_align(
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        multi_fragment_data.score_matrix,
+        multi_fragment_data.gap_open,
+        multi_fragment_data.gap_extend,
+    )
     assert alignment.score == 2
     assert alignment.frag_count == 8
     expected_frags = [
@@ -279,7 +305,13 @@ def test_global_align_multi_fragment(multi_fragment_data) -> None:
 
 
 def test_glocal_align_multi_fragment(multi_fragment_data) -> None:
-    alignment = glocal_align(multi_fragment_data.seqa, multi_fragment_data.seqb, multi_fragment_data.score_matrix, multi_fragment_data.gap_open, multi_fragment_data.gap_extend)
+    alignment = glocal_align(
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        multi_fragment_data.score_matrix,
+        multi_fragment_data.gap_open,
+        multi_fragment_data.gap_extend,
+    )
     assert alignment.score == 4
     assert alignment.frag_count == 7
     expected_frags = [
@@ -295,7 +327,13 @@ def test_glocal_align_multi_fragment(multi_fragment_data) -> None:
 
 
 def test_overlap_align_multi_fragment(multi_fragment_data) -> None:
-    alignment = overlap_align(multi_fragment_data.seqa, multi_fragment_data.seqb, multi_fragment_data.score_matrix, multi_fragment_data.gap_open, multi_fragment_data.gap_extend)
+    alignment = overlap_align(
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        multi_fragment_data.score_matrix,
+        multi_fragment_data.gap_open,
+        multi_fragment_data.gap_extend,
+    )
     assert alignment.score == 4
     assert alignment.frag_count == 5
     expected_frags = [
