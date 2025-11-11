@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 pyo3 = { version = "0.21.2", features = ["extension-module", "generate-import-lib"] }
 numpy = "0.21.0"
+ndarray = "0.15"
 
 [lib]
 name = "seq_align"

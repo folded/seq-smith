@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 use numpy::{PyReadonlyArray2};
+use ndarray::{Array1, Array2};
 
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -96,13 +97,13 @@ impl Direction {
 }
 
 
-fn traceback(dir_matrix: &[Direction], sb_len: usize, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
+fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
 
     while s_col >= 0 && s_row >= 0 {
-        let d_kind = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind();
+        let d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -132,7 +133,7 @@ fn traceback(dir_matrix: &[Direction], sb_len: usize, s_col: usize, s_row: usize
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
+                    if !matches!(dir_matrix[[s_col as usize, s_row as usize]].kind(), DirectionKind::Match) {
                         break;
                     }
                 }
@@ -149,8 +150,7 @@ fn traceback(dir_matrix: &[Direction], sb_len: usize, s_col: usize, s_row: usize
 }
 
 fn global_traceback(
-    dir_matrix: &[Direction],
-    sb_len: usize,
+    dir_matrix: &Array2<Direction>,
     s_col: usize,
     s_row: usize,
 ) -> Vec<AlignFrag> {
@@ -159,7 +159,7 @@ fn global_traceback(
     let mut s_row = s_row as i32;
 
     while s_col >= 0 && s_row >= 0 {
-        let d_kind = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind();
+        let d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -189,7 +189,7 @@ fn global_traceback(
                     if s_col < 0 || s_row < 0 {
                         break;
                     }
-                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
+                    if !matches!(dir_matrix[[s_col as usize, s_row as usize]].kind(), DirectionKind::Match) {
                         break;
                     }
                 }
@@ -246,11 +246,11 @@ fn local_align(
         ));
     }
 
-    let mut curr_score = vec![0; sb_len];
-    let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![Direction::STOP; sa_len * sb_len];
-    let mut hgap_pos = vec![0; sb_len];
-    let mut hgap_score = vec![0; sb_len];
+    let mut curr_score = Array1::zeros(sb_len);
+    let mut prev_score = Array1::zeros(sb_len);
+    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
+    let mut hgap_pos = Array1::zeros(sb_len);
+    let mut hgap_score = Array1::zeros(sb_len);
 
     let mut max_score = 0;
     let mut max_row = 0;
@@ -282,10 +282,10 @@ fn local_align(
         if score < 0 {
             curr_score[0] = 0;
             score = 0;
-            dir_matrix[col * sb_len] = Direction::STOP;
+            dir_matrix[[col, 0]].write(Direction::STOP);
         } else {
             curr_score[0] = score;
-            dir_matrix[col * sb_len] = dir;
+            dir_matrix[[col, 0]].write(dir);
             if score >= max_score {
                 max_row = 0;
                 max_col = col;
@@ -324,10 +324,10 @@ fn local_align(
             if score < 0 {
                 curr_score[row] = 0;
                 score = 0;
-                dir_matrix[col * sb_len + row] = Direction::STOP;
+                dir_matrix[[col, row]].write(Direction::STOP);
             } else {
                 curr_score[row] = score;
-                dir_matrix[col * sb_len + row] = dir;
+                dir_matrix[[col, row]].write(dir);
                 if score >= max_score {
                     max_row = row;
                     max_col = col;
@@ -352,7 +352,8 @@ fn local_align(
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
 
-    let align_frag = traceback(&dir_matrix, sb_len, max_col, max_row);
+    let dir_matrix = unsafe { dir_matrix.assume_init() };
+    let align_frag = traceback(&dir_matrix, max_col, max_row);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -383,11 +384,11 @@ fn global_align(
         ));
     }
 
-    let mut curr_score = vec![0; sb_len];
-    let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
-    let mut hgap_pos = vec![0; sb_len];
-    let mut hgap_score = vec![0; sb_len];
+    let mut curr_score = Array1::zeros(sb_len);
+    let mut prev_score = Array1::zeros(sb_len);
+    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
+    let mut hgap_pos = Array1::zeros(sb_len);
+    let mut hgap_score = Array1::zeros(sb_len);
 
     for row in 0..sb_len {
         prev_score[row] = gap_open + gap_extend * row as i32;
@@ -418,7 +419,7 @@ fn global_align(
         }
 
         curr_score[0] = score;
-        dir_matrix[col * sb_len] = dir;
+        dir_matrix[[col, 0]].write(dir);
 
         if score + gap_open >= vgap_score + gap_extend {
             vgap_score = score + gap_open;
@@ -449,7 +450,7 @@ fn global_align(
             }
 
             curr_score[row] = score;
-            dir_matrix[col * sb_len + row] = dir;
+            dir_matrix[[col, row]].write(dir);
 
             if score + gap_open >= vgap_score + gap_extend {
                 vgap_score = score + gap_open;
@@ -469,7 +470,8 @@ fn global_align(
     }
 
     let final_score = prev_score[sb_len - 1];
-    let align_frag = global_traceback(&dir_matrix, sa_len, sa_len - 1, sb_len - 1);
+    let dir_matrix = unsafe { dir_matrix.assume_init() };
+    let align_frag = global_traceback(&dir_matrix, sa_len - 1, sb_len - 1);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -500,11 +502,11 @@ fn glocal_align(
         ));
     }
 
-    let mut curr_score = vec![0; sb_len];
-    let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
-    let mut hgap_pos = vec![0; sb_len];
-    let mut hgap_score = vec![0; sb_len];
+    let mut curr_score = Array1::zeros(sb_len);
+    let mut prev_score = Array1::zeros(sb_len);
+    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
+    let mut hgap_pos = Array1::zeros(sb_len);
+    let mut hgap_score = Array1::zeros(sb_len);
 
     let mut max_score = 0;
     let mut max_row = 0;
@@ -521,7 +523,7 @@ fn glocal_align(
         let dir = Direction::MATCH;
 
         curr_score[0] = score;
-        dir_matrix[col * sb_len] = dir;
+        dir_matrix[[col, 0]].write(dir);
 
         let mut vgap_score = score + gap_open;
         let mut vgap_pos = 0;
@@ -541,7 +543,7 @@ fn glocal_align(
             }
 
             curr_score[row] = score;
-            dir_matrix[col * sb_len + row] = dir;
+            dir_matrix[[col, row]].write(dir);
 
             if score + gap_open >= vgap_score + gap_extend {
                 vgap_score = score + gap_open;
@@ -562,7 +564,7 @@ fn glocal_align(
         let dir = Direction::MATCH;
 
         curr_score[sb_len - 1] = score;
-        dir_matrix[col * sb_len + sb_len - 1] = dir;
+        dir_matrix[[col, sb_len - 1]].write(dir);
 
         if score >= max_score {
             max_row = sb_len - 1;
@@ -571,7 +573,8 @@ fn glocal_align(
         }
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
-    let align_frag = traceback(&dir_matrix, sb_len, max_col, max_row);
+    let dir_matrix = unsafe { dir_matrix.assume_init() };
+    let align_frag = traceback(&dir_matrix, max_col, max_row);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -602,11 +605,11 @@ fn overlap_align(
         ));
     }
 
-    let mut curr_score = vec![0; sb_len];
-    let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
-    let mut hgap_pos = vec![0; sb_len];
-    let mut hgap_score = vec![0; sb_len];
+    let mut curr_score = Array1::zeros(sb_len);
+    let mut prev_score = Array1::zeros(sb_len);
+    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
+    let mut hgap_pos = Array1::zeros(sb_len);
+    let mut hgap_score = Array1::zeros(sb_len);
 
     let mut max_score = std::i32::MIN;
     let mut max_row = -1;
@@ -616,7 +619,7 @@ fn overlap_align(
         curr_score[row] = score_matrix[[sa[0] as usize, sb[row] as usize]];
         hgap_pos[row] = 0;
         hgap_score[row] = curr_score[row] + gap_open;
-        dir_matrix[row] = Direction::MATCH;
+        dir_matrix[[0, row]].write(Direction::MATCH);
     }
 
     if curr_score[sb_len - 1] >= max_score {
@@ -632,7 +635,7 @@ fn overlap_align(
         let score_val = score_matrix[[sa[col] as usize, sb[0] as usize]];
         curr_score[0] = score_val;
         score = score_val;
-        dir_matrix[col * sb_len] = Direction::MATCH;
+        dir_matrix[[col, 0]].write(Direction::MATCH);
         let mut vgap_pos = 0;
         let mut vgap_score = score + gap_open;
 
@@ -651,7 +654,7 @@ fn overlap_align(
             }
 
             curr_score[row] = score;
-            dir_matrix[col * sb_len + row] = dir;
+            dir_matrix[[col, row]].write(dir);
 
             let is_gap_a = matches!(dir.kind(), DirectionKind::GapA(_));
 
@@ -684,7 +687,7 @@ fn overlap_align(
 
     let col = sa_len - 1;
     let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-    dir_matrix[col * sb_len] = Direction::MATCH;
+    dir_matrix[[col, 0]].write(Direction::MATCH);
     let mut vgap_pos = 0;
     let mut vgap_score = score + gap_open;
 
@@ -709,7 +712,7 @@ fn overlap_align(
         }
 
         curr_score[row] = score;
-        dir_matrix[col * sb_len + row] = dir;
+        dir_matrix[[col, row]].write(dir);
 
         if score >= max_score {
             max_row = row as i32;
@@ -743,9 +746,9 @@ fn overlap_align(
     let final_max_col = if max_col >= 0 { max_col as usize } else { 0 };
     let final_max_row = if max_row >= 0 { max_row as usize } else { 0 };
 
+    let dir_matrix = unsafe { dir_matrix.assume_init() };
     let align_frag = traceback(
         &dir_matrix,
-        sb_len,
         final_max_col,
         final_max_row,
     );
