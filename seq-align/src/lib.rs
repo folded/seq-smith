@@ -352,6 +352,10 @@ fn local_align(
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
 
+    // SAFETY: The `dir_matrix` is fully initialized in the preceding loops.
+    // The outer loop iterates from `col = 0..sa_len`, and the inner logic
+    // handles `row = 0` and then iterates from `row = 1..sb_len`, thus
+    // covering every cell of the matrix.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
     let align_frag = traceback(&dir_matrix, max_col, max_row);
 
@@ -470,6 +474,8 @@ fn global_align(
     }
 
     let final_score = prev_score[sb_len - 1];
+
+    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
     let align_frag = global_traceback(&dir_matrix, sa_len - 1, sb_len - 1);
 
@@ -573,6 +579,8 @@ fn glocal_align(
         }
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
+
+    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
     let align_frag = traceback(&dir_matrix, max_col, max_row);
 
@@ -746,6 +754,7 @@ fn overlap_align(
     let final_max_col = if max_col >= 0 { max_col as usize } else { 0 };
     let final_max_row = if max_row >= 0 { max_row as usize } else { 0 };
 
+    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
     let align_frag = traceback(
         &dir_matrix,
