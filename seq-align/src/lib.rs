@@ -310,7 +310,7 @@ fn local_align(
     // handles `row = 0` and then iterates from `row = 1..sb_len`, thus
     // covering every cell of the matrix.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, max_col.try_into().unwrap(), max_row.try_into().unwrap(), false, false);
+    let align_frag = traceback(&dir_matrix, max_col, max_row, false, false);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
