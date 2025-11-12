@@ -96,13 +96,14 @@ impl Direction {
     }
 }
 
-fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
+fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize, global_a: bool, global_b: bool) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
+    let mut d_kind = DirectionKind::Match;
 
     while s_col >= 0 && s_row >= 0 {
-        let d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
+        d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -147,79 +148,24 @@ fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<
         temp.sb_start = s_row + 1;
         result.push(temp);
     }
-    result.reverse();
-    result
-}
 
-fn global_traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
-    let mut result = Vec::new();
-    let mut s_col = s_col as i32;
-    let mut s_row = s_row as i32;
-
-    while s_col >= 0 && s_row >= 0 {
-        let d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
-
-        let mut temp = AlignFrag {
-            frag_type: FragType::Match,
-            sa_start: 0,
-            sb_start: 0,
-            len: 0,
-        };
-
-        match d_kind {
-            DirectionKind::Stop => break, // Should not happen in global
-            DirectionKind::GapA(len) => {
-                s_row -= len;
-                temp.frag_type = FragType::AGap;
-                temp.len = len;
-            }
-            DirectionKind::GapB(len) => {
-                s_col -= len;
-                temp.frag_type = FragType::BGap;
-                temp.len = len;
-            }
-            DirectionKind::Match => {
-                let mut count = 0;
-                loop {
-                    s_col -= 1;
-                    s_row -= 1;
-                    count += 1;
-                    if s_col < 0 || s_row < 0 {
-                        break;
-                    }
-                    if !matches!(
-                        dir_matrix[[s_col as usize, s_row as usize]].kind(),
-                        DirectionKind::Match
-                    ) {
-                        break;
-                    }
-                }
-                temp.frag_type = FragType::Match;
-                temp.len = count;
-            }
+    if !matches!(d_kind, DirectionKind::Stop) {
+        if global_b && s_row >=0 {
+            result.push(AlignFrag {
+                frag_type: FragType::AGap,
+                sa_start: 0,
+                sb_start: 0,
+                len: s_row + 1,
+            });
         }
-        temp.sa_start = s_col + 1;
-        temp.sb_start = s_row + 1;
-        result.push(temp);
-    }
-
-    if s_col >= 0 || s_row >= 0 {
-        let mut temp = AlignFrag {
-            frag_type: FragType::Match,
-            sa_start: 0,
-            sb_start: 0,
-            len: 0,
-        };
-        temp.sa_start = 0;
-        temp.sb_start = 0;
-        if s_col >= 0 {
-            temp.frag_type = FragType::BGap;
-            temp.len = s_col + 1;
-        } else {
-            temp.frag_type = FragType::AGap;
-            temp.len = s_row + 1;
+        if global_a && s_col >= 0 {
+            result.push(AlignFrag {
+                frag_type: FragType::BGap,
+                sa_start: 0,
+                sb_start: 0,
+                len: s_col + 1,
+            });
         }
-        result.push(temp);
     }
     result.reverse();
     result
@@ -364,7 +310,7 @@ fn local_align(
     // handles `row = 0` and then iterates from `row = 1..sb_len`, thus
     // covering every cell of the matrix.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, max_col, max_row);
+    let align_frag = traceback(&dir_matrix, max_col.try_into().unwrap(), max_row.try_into().unwrap(), false, false);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -492,7 +438,7 @@ fn global_align(
 
     // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = global_traceback(&dir_matrix, sa_len - 1, sb_len - 1);
+    let align_frag = traceback(&dir_matrix, sa_len - 1, sb_len - 1, true, true);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -529,7 +475,7 @@ fn glocal_align(
     let mut hgap_pos = Array1::uninit(sb_len);
     let mut hgap_score = Array1::uninit(sb_len);
 
-    let mut max_score = 0;
+    let mut max_score = std::i32::MIN;
     let mut max_row = 0;
     let mut max_col = 0;
 
@@ -548,15 +494,27 @@ fn glocal_align(
 
     for col in 0..sa_len {
         let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        let dir = Direction::MATCH;
+        let mut dir = Direction::MATCH;
+
+        let mut vgap_pos = -1;
+        let mut vgap_score = gap_open;
+
+        if score < vgap_score {
+            score = vgap_score;
+            dir = Direction::gap_a(0 - vgap_pos);
+        }
 
         curr_score[0] = score;
         dir_matrix[[col, 0]].write(dir);
 
-        let mut vgap_score = score + gap_open;
-        let mut vgap_pos = 0;
+        if score + gap_open >= vgap_score + gap_extend {
+            vgap_score = score + gap_open;
+            vgap_pos = 0;
+        } else {
+            vgap_score += gap_extend;
+        }
 
-        for row in 1..sb_len - 1 {
+        for row in 1..sb_len {
             score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
             let mut dir = Direction::MATCH;
 
@@ -588,23 +546,17 @@ fn glocal_align(
             }
         }
 
-        score = prev_score[sb_len - 2] + score_matrix[[sa[col] as usize, sb[sb_len - 1] as usize]];
-        let dir = Direction::MATCH;
-
-        curr_score[sb_len - 1] = score;
-        dir_matrix[[col, sb_len - 1]].write(dir);
-
-        if score >= max_score {
+        if curr_score[sb_len - 1] >= max_score {
             max_row = sb_len - 1;
             max_col = col;
-            max_score = score;
+            max_score = curr_score[sb_len - 1];
         }
         std::mem::swap(&mut curr_score, &mut prev_score);
     }
 
     // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, max_col, max_row);
+    let align_frag = traceback(&dir_matrix, max_col, max_row, false, true);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
@@ -782,7 +734,7 @@ fn overlap_align(
 
     // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
     let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, final_max_col, final_max_row);
+    let align_frag = traceback(&dir_matrix, final_max_col, final_max_row, false, true);
 
     let frag_count = align_frag.len();
     Ok(Alignment {
