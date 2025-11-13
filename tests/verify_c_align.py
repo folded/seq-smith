@@ -5,9 +5,9 @@ from c_align import (
     CAlignmentPtr,
     FragType,
     global_align,
-    local_global_align,
     lib,
     local_align,
+    local_global_align,
     overlap_align,
 )
 

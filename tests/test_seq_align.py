@@ -6,8 +6,8 @@ from seq_align import (
     AlignFrag,
     FragType,
     global_align,
-    local_global_align,
     local_align,
+    local_global_align,
     overlap_align,
 )
 
@@ -22,7 +22,13 @@ def _decode(encoded_seq: bytes, alphabet: str) -> str:
     """Decode a byte-encoded sequence back to string using the provided alphabet."""
     return "".join(alphabet[b] for b in encoded_seq)
 
-def format_alignment_ascii(seqa_bytes: bytes, seqb_bytes: bytes, align_frags: list[AlignFrag], alphabet: str) -> tuple[str, str]:
+
+def format_alignment_ascii(
+    seqa_bytes: bytes,
+    seqb_bytes: bytes,
+    align_frags: list[AlignFrag],
+    alphabet: str,
+) -> tuple[str, str]:
     seqa = _decode(seqa_bytes, alphabet)
     seqb = _decode(seqb_bytes, alphabet)
     aligned_seqa_list = []
@@ -31,14 +37,14 @@ def format_alignment_ascii(seqa_bytes: bytes, seqb_bytes: bytes, align_frags: li
     for frag in align_frags:
         match frag.frag_type:
             case FragType.Match:
-                aligned_seqa_list.append(seqa[frag.sa_start:frag.sa_start + frag.len])
-                aligned_seqb_list.append(seqb[frag.sb_start:frag.sb_start + frag.len])
+                aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
+                aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
             case FragType.AGap:
-                aligned_seqa_list.append('-' * frag.len)
-                aligned_seqb_list.append(seqb[frag.sb_start:frag.sb_start + frag.len])
+                aligned_seqa_list.append("-" * frag.len)
+                aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
             case FragType.BGap:
-                aligned_seqa_list.append(seqa[frag.sa_start:frag.sa_start + frag.len])
-                aligned_seqb_list.append('-' * frag.len)
+                aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
+                aligned_seqb_list.append("-" * frag.len)
 
     return "".join(aligned_seqa_list), "".join(aligned_seqb_list)
 
@@ -206,7 +212,10 @@ def test_local_global_align_subsegment_global_seqb(local_global_test_data: Align
 
     assert alignment.score == 4
     aligned_a, aligned_b = format_alignment_ascii(
-        local_global_test_data.seqa, local_global_test_data.seqb, alignment.align_frag, local_global_test_data.alphabet
+        local_global_test_data.seqa,
+        local_global_test_data.seqb,
+        alignment.align_frag,
+        local_global_test_data.alphabet,
     )
     assert aligned_a == "ACGT"
     assert aligned_b == "ACGT"
@@ -302,7 +311,10 @@ def test_local_align_multi_fragment(multi_fragment_data: AlignmentInput) -> None
     )
     assert alignment.score == 4
     aligned_a, aligned_b = format_alignment_ascii(
-        multi_fragment_data.seqa, multi_fragment_data.seqb, alignment.align_frag, multi_fragment_data.alphabet
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        alignment.align_frag,
+        multi_fragment_data.alphabet,
     )
     assert aligned_a == "AG-AG-AG"
     assert aligned_b == "AGCAGCAG"
@@ -318,7 +330,10 @@ def test_global_align_multi_fragment(multi_fragment_data: AlignmentInput) -> Non
     )
     assert alignment.score == 2
     aligned_a, aligned_b = format_alignment_ascii(
-        multi_fragment_data.seqa, multi_fragment_data.seqb, alignment.align_frag, multi_fragment_data.alphabet
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        alignment.align_frag,
+        multi_fragment_data.alphabet,
     )
     assert aligned_a == "AG-AG-AGAGAG"
     assert aligned_b == "AGCAGCAG-CA-"
@@ -335,7 +350,10 @@ def test_local_global_align_multi_fragment(multi_fragment_data: AlignmentInput) 
     )
     assert alignment.score == 4
     aligned_a, aligned_b = format_alignment_ascii(
-        multi_fragment_data.seqa, multi_fragment_data.seqb, alignment.align_frag, multi_fragment_data.alphabet
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        alignment.align_frag,
+        multi_fragment_data.alphabet,
     )
     assert aligned_a == "AG-AG-AG-A"
     assert aligned_b == "AGCAGCAGCA"
@@ -351,7 +369,10 @@ def test_overlap_align_multi_fragment(multi_fragment_data: AlignmentInput) -> No
     )
     assert alignment.score == 4
     aligned_a, aligned_b = format_alignment_ascii(
-        multi_fragment_data.seqa, multi_fragment_data.seqb, alignment.align_frag, multi_fragment_data.alphabet
+        multi_fragment_data.seqa,
+        multi_fragment_data.seqb,
+        alignment.align_frag,
+        multi_fragment_data.alphabet,
     )
     assert aligned_a == "AG-AG-AG"
     assert aligned_b == "AGCAGCAG"
@@ -380,12 +401,24 @@ def test_global_align_empty_seqb(common_data: AlignmentInput) -> None:
 
 def test_local_global_align_empty_seqa(common_data: AlignmentInput) -> None:
     with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
-        local_global_align(b"", common_data.seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+        local_global_align(
+            b"",
+            common_data.seqb,
+            common_data.score_matrix,
+            common_data.gap_open,
+            common_data.gap_extend,
+        )
 
 
 def test_local_global_align_empty_seqb(common_data: AlignmentInput) -> None:
     with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
-        local_global_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+        local_global_align(
+            common_data.seqa,
+            b"",
+            common_data.score_matrix,
+            common_data.gap_open,
+            common_data.gap_extend,
+        )
 
 
 def test_overlap_align_empty_seqa(common_data: AlignmentInput) -> None:
@@ -396,6 +429,7 @@ def test_overlap_align_empty_seqa(common_data: AlignmentInput) -> None:
 def test_overlap_align_empty_seqb(common_data: AlignmentInput) -> None:
     with pytest.raises(ValueError, match=r"Input sequences cannot be empty."):
         overlap_align(common_data.seqa, b"", common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+
 
 @pytest.fixture
 def poly_data() -> AlignmentInput:
@@ -428,7 +462,12 @@ def test_local_align_poly(poly_data: AlignmentInput) -> None:
         poly_data.gap_extend,
     )
     assert alignment.score == 2
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data.seqa, poly_data.seqb, alignment.align_frag, poly_data.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqa,
+        poly_data.seqb,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
     assert aligned_seqa == "ACAA"
     assert aligned_seqb == "AAAA"
 
@@ -442,7 +481,12 @@ def test_global_align_poly(poly_data: AlignmentInput) -> None:
         poly_data.gap_extend,
     )
     assert alignment.score == -13
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data.seqa, poly_data.seqb, alignment.align_frag, poly_data.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqa,
+        poly_data.seqb,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
     assert aligned_seqa == "CCCCCCAA----CAA"
     assert aligned_seqb == "--TTAAAAGGGGGGG"
 
@@ -456,7 +500,12 @@ def test_global_align_poly_strong_gap_penalty(poly_data: AlignmentInput) -> None
         -100,
     )
     assert alignment.score == -211
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data.seqa, poly_data.seqb, alignment.align_frag, poly_data.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqa,
+        poly_data.seqb,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
     assert aligned_seqa == "--CCCCCCAACAA"
     assert aligned_seqb == "TTAAAAGGGGGGG"
 
@@ -470,7 +519,12 @@ def test_local_global_align_poly(poly_data: AlignmentInput) -> None:
         poly_data.gap_extend,
     )
     assert alignment.score == -8
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data.seqa, poly_data.seqb, alignment.align_frag, poly_data.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqa,
+        poly_data.seqb,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
     assert aligned_seqa == "CCAACA------A"
     assert aligned_seqb == "TTAAAAGGGGGGG"
 
@@ -506,7 +560,12 @@ def test_local_global_align_poly_strong_gap_penalty(poly_data_strong_gap_penalty
         poly_data_strong_gap_penalty.gap_extend,
     )
     assert alignment.score == -4
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data_strong_gap_penalty.seqa, poly_data_strong_gap_penalty.seqb, alignment.align_frag, poly_data_strong_gap_penalty.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data_strong_gap_penalty.seqa,
+        poly_data_strong_gap_penalty.seqb,
+        alignment.align_frag,
+        poly_data_strong_gap_penalty.alphabet,
+    )
     assert aligned_seqa == "CAACAACCCC"
     assert aligned_seqb == "TTAAAAGGGG"
 
@@ -520,6 +579,11 @@ def test_overlap_align_poly(poly_data: AlignmentInput) -> None:
         poly_data.gap_extend,
     )
     assert alignment.score == 0
-    aligned_seqa, aligned_seqb = format_alignment_ascii(poly_data.seqa, poly_data.seqb, alignment.align_frag, poly_data.alphabet)
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqa,
+        poly_data.seqb,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
     assert aligned_seqa == "CAACAA"
     assert aligned_seqb == "TTAAAA"
