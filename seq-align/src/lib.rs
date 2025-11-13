@@ -449,7 +449,7 @@ fn global_align(
 }
 
 #[pyfunction]
-fn glocal_align(
+fn local_global_align(
     seqa: &[u8],
     seqb: &[u8],
     score_matrix: PyReadonlyArray2<i32>,
@@ -748,7 +748,7 @@ fn overlap_align(
 fn seq_align(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(local_align, m)?)?;
     m.add_function(wrap_pyfunction!(global_align, m)?)?;
-    m.add_function(wrap_pyfunction!(glocal_align, m)?)?;
+    m.add_function(wrap_pyfunction!(local_global_align, m)?)?;
     m.add_function(wrap_pyfunction!(overlap_align, m)?)?;
     m.add_class::<Alignment>()?;
     m.add_class::<AlignFrag>()?;

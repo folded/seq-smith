@@ -86,7 +86,7 @@ lib.global_align.argtypes = [
 ]
 lib.global_align.restype = ctypes.POINTER(CAlignment)
 
-lib.glocal_align.argtypes = [
+lib.local_global_align.argtypes = [
     UBytePtr,
     ctypes.c_int,
     UBytePtr,
@@ -96,7 +96,7 @@ lib.glocal_align.argtypes = [
     ctypes.c_int,
     ctypes.c_int,
 ]
-lib.glocal_align.restype = ctypes.POINTER(CAlignment)
+lib.local_global_align.restype = ctypes.POINTER(CAlignment)
 
 lib.overlap_align.argtypes = [
     UBytePtr,
@@ -141,8 +141,8 @@ def global_align(params: AlignParams) -> CAlignmentPtr:
     return _align_wrapper(lib.global_align, params)
 
 
-def glocal_align(params: AlignParams) -> CAlignmentPtr:
-    return _align_wrapper(lib.glocal_align, params)
+def local_global_align(params: AlignParams) -> CAlignmentPtr:
+    return _align_wrapper(lib.local_global_align, params)
 
 
 def overlap_align(params: AlignParams) -> CAlignmentPtr:

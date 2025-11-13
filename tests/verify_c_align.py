@@ -5,7 +5,7 @@ from c_align import (
     CAlignmentPtr,
     FragType,
     global_align,
-    glocal_align,
+    local_global_align,
     lib,
     local_align,
     overlap_align,
@@ -171,8 +171,8 @@ def test_c_global_align_simple(common_data: AlignParams) -> None:
     assert alignment.align_frag == expected_frags
 
 
-def test_c_glocal_align_simple(common_data: AlignParams) -> None:
-    c_alignment_ptr = glocal_align(common_data)
+def test_c_local_global_align_simple(common_data: AlignParams) -> None:
+    c_alignment_ptr = local_global_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
 
     assert alignment.score == 0
@@ -230,8 +230,8 @@ def test_c_global_align_multi_fragment(multi_fragment_data: AlignParams) -> None
     assert alignment.align_frag == expected_frags
 
 
-def test_c_glocal_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
-    c_alignment_ptr = glocal_align(multi_fragment_data)
+def test_c_local_global_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
+    c_alignment_ptr = local_global_align(multi_fragment_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
 
     assert alignment.score == 4
@@ -293,16 +293,16 @@ def test_c_global_align_empty_seqb(common_data: AlignParams) -> None:
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
 
 
-def test_c_glocal_align_empty_seqa(common_data: AlignParams) -> None:
+def test_c_local_global_align_empty_seqa(common_data: AlignParams) -> None:
     common_data.seqa = b""
-    c_alignment_ptr = glocal_align(common_data)
+    c_alignment_ptr = local_global_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
 
 
-def test_c_glocal_align_empty_seqb(common_data: AlignParams) -> None:
+def test_c_local_global_align_empty_seqb(common_data: AlignParams) -> None:
     common_data.seqb = b""
-    c_alignment_ptr = glocal_align(common_data)
+    c_alignment_ptr = local_global_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
     assert alignment is None or (alignment.score == 0 and alignment.frag_count == 0)
 

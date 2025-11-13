@@ -1,5 +1,5 @@
 /*
-glocal_align.c
+local_global_align.c
 
 Created by Toby Sargeant.
 Copyright (c) 2013-2015  Toby Sargeant and The University of Melbourne. All
@@ -73,7 +73,7 @@ static AlignFrag *traceback(const unsigned char *sa, int sa_len,
 }
 
 // ============================================================================
-Alignment *glocal_align_raw(const unsigned char *sa, int sa_len,
+Alignment *local_global_align_raw(const unsigned char *sa, int sa_len,
                             const unsigned char *sb, int sb_len, int alpha_len,
                             int *score_matrix, int gap_open, int gap_extend) {
   Alignment *result = NULL;
@@ -209,9 +209,9 @@ fail:
 }
 
 // ============================================================================
-Alignment *glocal_align(const unsigned char *seqa, int sa_len,
+Alignment *local_global_align(const unsigned char *seqa, int sa_len,
                         const unsigned char *seqb, int sb_len, int alpha_len,
                         int *score_matrix, int gap_open, int gap_extend) {
-  return glocal_align_raw(seqa, sa_len, seqb, sb_len, alpha_len, score_matrix,
+  return local_global_align_raw(seqa, sa_len, seqb, sb_len, alpha_len, score_matrix,
                           gap_open, gap_extend);
 }

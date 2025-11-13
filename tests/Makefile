@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -c -fPIC -I align
 LDFLAGS = -shared
 
-SRCS = align/align.c align/alignment.c align/global_align.c align/glocal_align.c align/local_align.c
+SRCS = align/align.c align/alignment.c align/global_align.c align/local_global_align.c align/local_align.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 TARGET = libalign.so
 
