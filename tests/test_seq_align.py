@@ -620,6 +620,7 @@ def test_overlap_align_poly(poly_data: AlignmentInput) -> None:
     assert aligned_seqa == "CAACAA"
     assert aligned_seqb == "TTAAAA"
 
+
 def test_overlap_align_poly_flipped(poly_data: AlignmentInput) -> None:
     alignment = overlap_align(
         poly_data.seqb,
