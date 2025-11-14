@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, ArrayView2};
 use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
@@ -62,6 +62,162 @@ struct Alignment {
     score: i32,
 }
 
+struct AlignmentParams<'a> {
+    sa: &'a [u8],
+    sb: &'a [u8],
+    sa_len: usize,
+    sb_len: usize,
+    score_matrix: ArrayView2<'a, i32>,
+    gap_open: i32,
+    gap_extend: i32,
+}
+
+impl<'a> AlignmentParams<'a> {
+    fn new(
+        seqa: &'a [u8],
+        seqb: &'a [u8],
+        score_matrix: ArrayView2<'a, i32>,
+        gap_open: i32,
+        gap_extend: i32,
+    ) -> PyResult<Self> {
+        if seqa.is_empty() || seqb.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Input sequences cannot be empty.",
+            ));
+        }
+        Ok(Self {
+            sa: seqa,
+            sb: seqb,
+            sa_len: seqa.len(),
+            sb_len: seqb.len(),
+            score_matrix,
+            gap_open,
+            gap_extend,
+        })
+    }
+
+    #[inline(always)]
+    fn match_score(&self, row: usize, col: usize) -> i32 {
+        self.score_matrix[[self.sa[col] as usize, self.sb[row] as usize]]
+    }
+
+    #[inline(always)]
+    fn gap_cost(&self, gap_len: i32) -> i32 {
+        if gap_len == 0 {
+            0
+        } else {
+            self.gap_open
+                .saturating_add(self.gap_extend.saturating_mul(gap_len - 1))
+        }
+    }
+}
+
+struct AlignmentData {
+    curr_score: Array1<i32>,
+    prev_score: Array1<i32>,
+    dir_matrix: Array2<Direction>,
+    hgap_pos: Array1<i32>,
+    hgap_score: Array1<i32>,
+    vgap_pos: i32,
+    vgap_score: i32,
+}
+
+impl AlignmentData {
+    fn new(params: &AlignmentParams) -> Self {
+        unsafe {
+            Self {
+                curr_score: Array1::uninit(params.sb_len).assume_init(),
+                prev_score: Array1::uninit(params.sb_len).assume_init(),
+                dir_matrix: Array2::uninit((params.sa_len, params.sb_len)).assume_init(),
+                hgap_pos: Array1::uninit(params.sb_len).assume_init(),
+                hgap_score: Array1::uninit(params.sb_len).assume_init(),
+                vgap_pos: -1,
+                vgap_score: 0,
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn debug_col_scores(&self, col: usize) {
+        let sb_len = self.curr_score.len();
+        let mut line = format!("[{}]", col);
+        for row in 0..sb_len {
+            let dir_char = match self.dir_matrix[[col, row]].kind() {
+                DirectionKind::Match => "\\",
+                DirectionKind::GapA(_) => "-",
+                DirectionKind::GapB(_) => "|",
+                DirectionKind::Stop => "*",
+            };
+            let score = self.curr_score[row];
+            line.push_str(&format!(" {} {:<3}", dir_char, score));
+        }
+        eprintln!("{}", line);
+    }
+
+    #[inline(always)]
+    fn swap_scores(&mut self) {
+        std::mem::swap(&mut self.curr_score, &mut self.prev_score);
+    }
+
+    #[inline(always)]
+    fn compute_cell(&self, row: usize, col: usize, mut score: i32) -> (i32, Direction) {
+        let mut dir = Direction::MATCH;
+        if score < self.vgap_score {
+            score = self.vgap_score;
+            dir = Direction::gap_a((row as i32).saturating_sub(self.vgap_pos));
+        }
+        if score < self.hgap_score[row] {
+            score = self.hgap_score[row];
+            dir = Direction::gap_b((col as i32).saturating_sub(self.hgap_pos[row]));
+        }
+        (score, dir)
+    }
+
+    #[inline(always)]
+    fn compute_cell_clipped(&self, row: usize, col: usize, score: i32) -> (i32, Direction) {
+        let (score, dir) = self.compute_cell(row, col, score);
+        if score < 0 {
+            (0, Direction::STOP)
+        } else {
+            (score, dir)
+        }
+    }
+
+    #[inline(always)]
+    fn update_gaps(&mut self, row: usize, col: usize, score: i32, params: &AlignmentParams) {
+        if score.saturating_add(params.gap_open) >= self.vgap_score.saturating_add(params.gap_extend) {
+            self.vgap_score = score.saturating_add(params.gap_open);
+            self.vgap_pos = row as i32;
+        } else {
+            self.vgap_score = self.vgap_score.saturating_add(params.gap_extend);
+        }
+        if score.saturating_add(params.gap_open) >= self.hgap_score[row].saturating_add(params.gap_extend) {
+            self.hgap_score[row] = score.saturating_add(params.gap_open);
+            self.hgap_pos[row] = col as i32;
+        } else {
+            self.hgap_score[row] = self.hgap_score[row].saturating_add(params.gap_extend);
+        }
+    }
+
+    #[inline(always)]
+    fn write_cell(&mut self, row: usize, col: usize, score: i32, dir: Direction) {
+        self.dir_matrix[[col, row]] = dir;
+        self.curr_score[row] = score;
+    }
+
+    #[inline(always)]
+    fn compute_and_write_cell(
+        &mut self,
+        row: usize,
+        col: usize,
+        match_score: i32,
+    ) -> (i32, Direction) {
+        let (score, dir) = self.compute_cell(row, col, match_score);
+        self.write_cell(row, col, score, dir);
+        (score, dir)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Direction(i32);
 
@@ -76,16 +232,19 @@ impl Direction {
     const MATCH: Self = Self(0);
     const STOP: Self = Self(i32::MIN);
 
+    #[inline(always)]
     fn gap_a(len: i32) -> Self {
         debug_assert!(len > 0);
         Self(-len)
     }
 
+    #[inline(always)]
     fn gap_b(len: i32) -> Self {
         debug_assert!(len > 0);
         Self(len)
     }
 
+    #[inline(always)]
     fn kind(&self) -> DirectionKind {
         match self.0 {
             0 => DirectionKind::Match,
@@ -96,14 +255,20 @@ impl Direction {
     }
 }
 
-fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize, global_a: bool, global_b: bool) -> Vec<AlignFrag> {
+fn traceback(
+    data: &AlignmentData,
+    s_col: usize,
+    s_row: usize,
+    global_a: bool,
+    global_b: bool,
+) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
     let mut d_kind = DirectionKind::Match;
 
     while s_col >= 0 && s_row >= 0 {
-        d_kind = dir_matrix[[s_col as usize, s_row as usize]].kind();
+        d_kind = data.dir_matrix[[s_col as usize, s_row as usize]].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -134,7 +299,7 @@ fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize, global_
                         break;
                     }
                     if !matches!(
-                        dir_matrix[[s_col as usize, s_row as usize]].kind(),
+                        data.dir_matrix[[s_col as usize, s_row as usize]].kind(),
                         DirectionKind::Match
                     ) {
                         break;
@@ -150,7 +315,7 @@ fn traceback(dir_matrix: &Array2<Direction>, s_col: usize, s_row: usize, global_
     }
 
     if !matches!(d_kind, DirectionKind::Stop) {
-        if global_b && s_row >=0 {
+        if global_b && s_row >= 0 {
             result.push(AlignFrag {
                 frag_type: FragType::AGap,
                 sa_start: 0,
@@ -179,143 +344,51 @@ fn local_align(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let sa = seqa;
-    let sb = seqb;
-    let score_matrix = score_matrix.as_array();
-
-    let sa_len = sa.len();
-    let sb_len = sb.len();
-
-    if sa_len == 0 || sb_len == 0 {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input sequences cannot be empty.",
-        ));
-    }
-
-    let curr_score = Array1::uninit(sb_len);
-    let mut prev_score = Array1::uninit(sb_len);
-    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::uninit(sb_len);
-    let mut hgap_score = Array1::uninit(sb_len);
+    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let mut data = AlignmentData::new(&params);
 
     let mut max_score = 0;
     let mut max_row = 0;
     let mut max_col = 0;
 
-    for row in 0..sb_len {
-        hgap_pos[row].write(-1);
-        hgap_score[row].write(gap_open);
-        prev_score[row].write(0);
+    let mut update_max_score = |score: i32, row: usize, col: usize| {
+        if score >= max_score {
+            max_row = row;
+            max_col = col;
+            max_score = score;
+        }
+    };
+
+    for row in 0..params.sb_len {
+        data.hgap_pos[row] = -1;
+        data.hgap_score[row] = params.gap_open;
+        data.prev_score[row] = 0;
     }
 
-    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
-    let mut prev_score = unsafe { prev_score.assume_init() };
-    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
-    let mut hgap_score = unsafe { hgap_score.assume_init() };
-    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
-    let mut curr_score = unsafe { curr_score.assume_init() };
+    for col in 0..params.sa_len {
+        data.vgap_pos = -1;
+        data.vgap_score = params.gap_open;
 
-    for col in 0..sa_len {
-        let mut vgap_pos = -1;
-        let mut vgap_score = gap_open;
+        let (score, dir) = data.compute_cell_clipped(0, col, params.match_score(0, col));
+        update_max_score(score, 0, col);
+        data.write_cell(0, col, score, dir);
+        data.update_gaps(0, col, score, &params);
 
-        let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        let mut dir = Direction::MATCH;
-
-        if score < vgap_score {
-            score = vgap_score;
-            dir = Direction::gap_a(0 - vgap_pos);
+        for row in 1..params.sb_len {
+            let match_score = data.prev_score[row - 1].saturating_add(params.match_score(row, col));
+            let (score, dir) = data.compute_cell_clipped(row, col, match_score);
+            update_max_score(score, row, col);
+            data.write_cell(row, col, score, dir);
+            data.update_gaps(row, col, score, &params);
         }
-
-        if score < hgap_score[0] {
-            score = hgap_score[0];
-            dir = Direction::gap_b(col as i32 - hgap_pos[0]);
-        }
-
-        if score < 0 {
-            curr_score[0] = 0;
-            score = 0;
-            dir_matrix[[col, 0]].write(Direction::STOP);
-        } else {
-            curr_score[0] = score;
-            dir_matrix[[col, 0]].write(dir);
-            if score >= max_score {
-                max_row = 0;
-                max_col = col;
-                max_score = score;
-            }
-        }
-
-        if score + gap_open >= vgap_score + gap_extend {
-            vgap_score = score + gap_open;
-            vgap_pos = 0;
-        } else {
-            vgap_score += gap_extend;
-        }
-
-        if score + gap_open >= hgap_score[0] + gap_extend {
-            hgap_score[0] = score + gap_open;
-            hgap_pos[0] = col as i32;
-        } else {
-            hgap_score[0] += gap_extend;
-        }
-
-        for row in 1..sb_len {
-            score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            dir = Direction::MATCH;
-
-            if score < vgap_score {
-                score = vgap_score;
-                dir = Direction::gap_a((row as i32) - vgap_pos);
-            }
-
-            if score < hgap_score[row] {
-                score = hgap_score[row];
-                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
-            }
-
-            if score < 0 {
-                curr_score[row] = 0;
-                score = 0;
-                dir_matrix[[col, row]].write(Direction::STOP);
-            } else {
-                curr_score[row] = score;
-                dir_matrix[[col, row]].write(dir);
-                if score >= max_score {
-                    max_row = row;
-                    max_col = col;
-                    max_score = score;
-                }
-            }
-
-            if score + gap_open >= vgap_score + gap_extend {
-                vgap_score = score + gap_open;
-                vgap_pos = row as i32;
-            } else {
-                vgap_score += gap_extend;
-            }
-
-            if score + gap_open >= hgap_score[row] + gap_extend {
-                hgap_score[row] = score + gap_open;
-                hgap_pos[row] = col as i32;
-            } else {
-                hgap_score[row] += gap_extend;
-            }
-        }
-        std::mem::swap(&mut curr_score, &mut prev_score);
+        data.swap_scores();
     }
 
-    // SAFETY: The `dir_matrix` is fully initialized in the preceding loops.
-    // The outer loop iterates from `col = 0..sa_len`, and the inner logic
-    // handles `row = 0` and then iterates from `row = 1..sb_len`, thus
-    // covering every cell of the matrix.
-    let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, max_col, max_row, false, false);
+    let align_frag = traceback(&data, max_col, max_row, false, false);
 
-    let frag_count = align_frag.len();
     Ok(Alignment {
+        frag_count: align_frag.len(),
         align_frag: align_frag,
-        frag_count: frag_count,
         score: max_score,
     })
 }
@@ -328,122 +401,43 @@ fn global_align(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let sa = seqa;
-    let sb = seqb;
-    let score_matrix = score_matrix.as_array();
+    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let mut data = AlignmentData::new(&params);
 
-    let sa_len = sa.len();
-    let sb_len = sb.len();
-
-    if sa_len == 0 || sb_len == 0 {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input sequences cannot be empty.",
-        ));
+    for row in 0..params.sb_len {
+        let score = params.gap_cost(row as i32 + 1);
+        data.prev_score[row] = score;
+        data.hgap_pos[row] = -1;
+        data.hgap_score[row] = score.saturating_add(params.gap_open);
     }
 
-    let curr_score = Array1::uninit(sb_len);
-    let mut prev_score = Array1::uninit(sb_len);
-    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::uninit(sb_len);
-    let mut hgap_score = Array1::uninit(sb_len);
+    for col in 0..params.sa_len {
+        data.vgap_pos = -1;
+        data.vgap_score = params
+            .gap_cost(col as i32 + 1)
+            .saturating_add(params.gap_open);
 
-    for row in 0..sb_len {
-        let score = gap_open + gap_extend * row as i32;
-        prev_score[row].write(score);
-        hgap_pos[row].write(-1);
-        hgap_score[row].write(score + gap_open);
+        let match_score = params
+            .match_score(0, col)
+            .saturating_add(params.gap_cost(col as i32));
+
+        let (score, _) = data.compute_and_write_cell(0, col, match_score);
+        data.update_gaps(0, col, score, &params);
+
+        for row in 1..params.sb_len {
+            let match_score = data.prev_score[row - 1].saturating_add(params.match_score(row, col));
+            let (score, _) = data.compute_and_write_cell(row, col, match_score);
+            data.update_gaps(row, col, score, &params);
+        }
+        data.swap_scores();
     }
 
-    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
-    let mut prev_score = unsafe { prev_score.assume_init() };
-    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
-    let mut hgap_score = unsafe { hgap_score.assume_init() };
-    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
-    let mut curr_score = unsafe { curr_score.assume_init() };
+    let final_score = data.prev_score[params.sb_len - 1];
+    let align_frag = traceback(&data, params.sa_len - 1, params.sb_len - 1, true, true);
 
-    for col in 0..sa_len {
-        let mut vgap_pos = -1;
-        let mut vgap_score = gap_open * 2 + gap_extend * col as i32;
-
-        let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]]
-            + (if col > 0 {
-                gap_open + gap_extend * (col as i32 - 1)
-            } else {
-                0
-            });
-        let mut dir = Direction::MATCH;
-
-        if score < vgap_score {
-            score = vgap_score;
-            dir = Direction::gap_a(0 - vgap_pos);
-        }
-
-        if score < hgap_score[0] {
-            score = hgap_score[0];
-            dir = Direction::gap_b(col as i32 - hgap_pos[0]);
-        }
-
-        curr_score[0] = score;
-        dir_matrix[[col, 0]].write(dir);
-
-        if score + gap_open >= vgap_score + gap_extend {
-            vgap_score = score + gap_open;
-            vgap_pos = 0;
-        } else {
-            vgap_score += gap_extend;
-        }
-
-        if score + gap_open >= hgap_score[0] + gap_extend {
-            hgap_score[0] = score + gap_open;
-            hgap_pos[0] = col as i32;
-        } else {
-            hgap_score[0] += gap_extend;
-        }
-
-        for row in 1..sb_len {
-            score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            dir = Direction::MATCH;
-
-            if score < vgap_score {
-                score = vgap_score;
-                dir = Direction::gap_a((row as i32) - vgap_pos);
-            }
-
-            if score < hgap_score[row] {
-                score = hgap_score[row];
-                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
-            }
-
-            curr_score[row] = score;
-            dir_matrix[[col, row]].write(dir);
-
-            if score + gap_open >= vgap_score + gap_extend {
-                vgap_score = score + gap_open;
-                vgap_pos = row as i32;
-            } else {
-                vgap_score += gap_extend;
-            }
-
-            if score + gap_open >= hgap_score[row] + gap_extend {
-                hgap_score[row] = score + gap_open;
-                hgap_pos[row] = col as i32;
-            } else {
-                hgap_score[row] += gap_extend;
-            }
-        }
-        std::mem::swap(&mut curr_score, &mut prev_score);
-    }
-
-    let final_score = prev_score[sb_len - 1];
-
-    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
-    let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, sa_len - 1, sb_len - 1, true, true);
-
-    let frag_count = align_frag.len();
     Ok(Alignment {
+        frag_count: align_frag.len(),
         align_frag: align_frag,
-        frag_count: frag_count,
         score: final_score,
     })
 }
@@ -456,112 +450,45 @@ fn local_global_align(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let sa = seqa;
-    let sb = seqb;
-    let score_matrix = score_matrix.as_array();
-
-    let sa_len = sa.len();
-    let sb_len = sb.len();
-
-    if sa_len == 0 || sb_len == 0 {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input sequences cannot be empty.",
-        ));
-    }
-
-    let curr_score = Array1::uninit(sb_len);
-    let mut prev_score = Array1::uninit(sb_len);
-    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::uninit(sb_len);
-    let mut hgap_score = Array1::uninit(sb_len);
+    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
     let mut max_row = 0;
     let mut max_col = 0;
 
-    for row in 0..sb_len {
-        prev_score[row].write(std::i32::MIN / 2);
-        hgap_pos[row].write(-1);
-        hgap_score[row].write(std::i32::MIN / 2);
+    for row in 0..params.sb_len {
+        data.prev_score[row] = std::i32::MIN;
+        data.hgap_pos[row] = -1;
+        data.hgap_score[row] = std::i32::MIN;
     }
 
-    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
-    let mut prev_score = unsafe { prev_score.assume_init() };
-    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
-    let mut hgap_score = unsafe { hgap_score.assume_init() };
-    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
-    let mut curr_score = unsafe { curr_score.assume_init() };
+    for col in 0..params.sa_len {
+        data.vgap_pos = -1;
+        data.vgap_score = params.gap_open;
 
-    for col in 0..sa_len {
-        let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        let mut dir = Direction::MATCH;
+        let (score, _) = data.compute_and_write_cell(0, col, params.match_score(0, col));
+        data.update_gaps(0, col, score, &params);
 
-        let mut vgap_pos = -1;
-        let mut vgap_score = gap_open;
-
-        if score < vgap_score {
-            score = vgap_score;
-            dir = Direction::gap_a(0 - vgap_pos);
+        for row in 1..params.sb_len {
+            let match_score = data.prev_score[row - 1].saturating_add(params.match_score(row, col));
+            let (score, _) = data.compute_and_write_cell(row, col, match_score);
+            data.update_gaps(row, col, score, &params);
         }
 
-        curr_score[0] = score;
-        dir_matrix[[col, 0]].write(dir);
-
-        if score + gap_open >= vgap_score + gap_extend {
-            vgap_score = score + gap_open;
-            vgap_pos = 0;
-        } else {
-            vgap_score += gap_extend;
-        }
-
-        for row in 1..sb_len {
-            score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            let mut dir = Direction::MATCH;
-
-            if score < vgap_score {
-                score = vgap_score;
-                dir = Direction::gap_a((row as i32) - vgap_pos);
-            }
-
-            if score < hgap_score[row] {
-                score = hgap_score[row];
-                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
-            }
-
-            curr_score[row] = score;
-            dir_matrix[[col, row]].write(dir);
-
-            if score + gap_open >= vgap_score + gap_extend {
-                vgap_score = score + gap_open;
-                vgap_pos = row as i32;
-            } else {
-                vgap_score += gap_extend;
-            }
-
-            if score + gap_open >= hgap_score[row] + gap_extend {
-                hgap_score[row] = score + gap_open;
-                hgap_pos[row] = col as i32;
-            } else {
-                hgap_score[row] += gap_extend;
-            }
-        }
-
-        if curr_score[sb_len - 1] >= max_score {
-            max_row = sb_len - 1;
+        if data.curr_score[params.sb_len - 1] >= max_score {
+            max_row = params.sb_len - 1;
             max_col = col;
-            max_score = curr_score[sb_len - 1];
+            max_score = data.curr_score[params.sb_len - 1];
         }
-        std::mem::swap(&mut curr_score, &mut prev_score);
+        data.swap_scores();
     }
 
-    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
-    let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, max_col, max_row, false, true);
+    let align_frag = traceback(&data, max_col, max_row, false, true);
 
-    let frag_count = align_frag.len();
     Ok(Alignment {
+        frag_count: align_frag.len(),
         align_frag: align_frag,
-        frag_count: frag_count,
         score: max_score,
     })
 }
@@ -574,151 +501,51 @@ fn overlap_align(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let sa = seqa;
-    let sb = seqb;
-    let score_matrix = score_matrix.as_array();
+    // An overlap alignment must start on the bottom or right edge of the DP matrix.
+    // Gaps at the start are not penalized.
 
-    let sa_len = sa.len();
-    let sb_len = sb.len();
-
-    if sa_len == 0 || sb_len == 0 {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input sequences cannot be empty.",
-        ));
-    }
-
-    let curr_score = Array1::uninit(sb_len);
-    let mut prev_score = Array1::uninit(sb_len);
-    let mut dir_matrix = Array2::uninit((sa_len, sb_len));
-    let mut hgap_pos = Array1::uninit(sb_len);
-    let mut hgap_score = Array1::uninit(sb_len);
+    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
     let mut max_row = -1;
     let mut max_col = -1;
 
-    for row in 0..sb_len {
-        let score = score_matrix[[sa[0] as usize, sb[row] as usize]];
-        prev_score[row].write(score);
-        hgap_pos[row].write(0);
-        hgap_score[row].write(score + gap_open);
-        dir_matrix[[0, row]].write(Direction::MATCH);
-    }
-
-    // SAFETY: `prev_score`, `hgap_pos`, and `hgap_score` are fully initialized in the preceding loop.
-    let mut prev_score = unsafe { prev_score.assume_init() };
-    let mut hgap_pos = unsafe { hgap_pos.assume_init() };
-    let mut hgap_score = unsafe { hgap_score.assume_init() };
-    // SAFETY: `curr_score` is fully initialized before being read in the inner loop below.
-    let mut curr_score = unsafe { curr_score.assume_init() };
-
-    if prev_score[sb_len - 1] >= max_score {
-        max_row = sb_len as i32 - 1;
-        max_col = 0;
-        max_score = prev_score[sb_len - 1];
-    }
-
-    for col in 1..sa_len - 1 {
-        let mut score;
-        let score_val = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        curr_score[0] = score_val;
-        score = score_val;
-        dir_matrix[[col, 0]].write(Direction::MATCH);
-        let mut vgap_pos = 0;
-        let mut vgap_score = score + gap_open;
-
-        for row in 1..sb_len {
-            score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            let mut dir = Direction::MATCH;
-
-            if score < vgap_score {
-                score = vgap_score;
-                dir = Direction::gap_a((row as i32) - vgap_pos);
-            }
-
-            if score < hgap_score[row] {
-                score = hgap_score[row];
-                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
-            }
-
-            curr_score[row] = score;
-            dir_matrix[[col, row]].write(dir);
-
-            let is_gap_a = matches!(dir.kind(), DirectionKind::GapA(_));
-
-            if !is_gap_a && score + gap_open >= vgap_score + gap_extend {
-                vgap_score = score + gap_open;
-                vgap_pos = row as i32;
-            } else {
-                vgap_score += gap_extend;
-            }
-
-            let is_gap_b = matches!(dir.kind(), DirectionKind::GapB(_));
-
-            if !is_gap_b && score + gap_open >= hgap_score[row] + gap_extend {
-                hgap_score[row] = score + gap_open;
-                hgap_pos[row] = col as i32;
-            } else {
-                hgap_score[row] += gap_extend;
-            }
-        }
-        let last_row_score = curr_score[sb_len - 1];
-        if last_row_score >= max_score {
-            max_row = sb_len as i32 - 1;
-            max_col = col as i32;
-            max_score = last_row_score;
-        }
-        std::mem::swap(&mut curr_score, &mut prev_score);
-    }
-
-    let col = sa_len - 1;
-    let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-    dir_matrix[[col, 0]].write(Direction::MATCH);
-    let mut vgap_pos = 0;
-    let mut vgap_score = score + gap_open;
-
-    if score >= max_score {
-        max_row = 0;
-        max_col = sa_len as i32 - 1;
-        max_score = score;
-    }
-
-    for row in 1..sb_len {
-        let mut dir = Direction::MATCH;
-        score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-
-        if score < vgap_score {
-            score = vgap_score;
-            dir = Direction::gap_a((row as i32) - vgap_pos);
-        }
-
-        if score < hgap_score[row] {
-            score = hgap_score[row];
-            dir = Direction::gap_b(col as i32 - hgap_pos[row]);
-        }
-
-        curr_score[row] = score;
-        dir_matrix[[col, row]].write(dir);
-
+    let mut update_max_score = |score: i32, row: usize, col: usize| {
         if score >= max_score {
             max_row = row as i32;
-            max_col = sa_len as i32 - 1;
+            max_col = col as i32;
             max_score = score;
         }
+    };
 
-        if score + gap_open >= vgap_score + gap_extend {
-            vgap_score = score + gap_open;
-            vgap_pos = row as i32;
-        } else {
-            vgap_score += gap_extend;
-        }
+    for row in 0..params.sb_len {
+        data.prev_score[row] = 0;
+        data.hgap_pos[row] = -1;
+        data.hgap_score[row] = params.gap_open;
+    }
 
-        if score + gap_open >= hgap_score[row] + gap_extend {
-            hgap_score[row] = score + gap_open;
-            hgap_pos[row] = col as i32;
-        } else {
-            hgap_score[row] += gap_extend;
+    for col in 0..params.sa_len {
+        data.vgap_pos = -1;
+        data.vgap_score = params.gap_open;
+
+        let (score, dir) = data.compute_cell(0, col, params.match_score(0, col));
+
+        data.write_cell(0, col, score, dir);
+        data.update_gaps(0, col, score, &params);
+
+        for row in 1..params.sb_len {
+            let match_score = data.prev_score[row - 1].saturating_add(params.match_score(row, col));
+            let (score, dir) = data.compute_cell(row, col, match_score);
+
+            data.write_cell(row, col, score, dir);
+            data.update_gaps(row, col, score, &params);
         }
+        update_max_score(data.curr_score[params.sb_len - 1], params.sb_len - 1, col);
+        data.swap_scores();
+    }
+    for row in 0..params.sb_len {
+        update_max_score(data.prev_score[row], row, params.sa_len - 1);
     }
 
     if max_score == std::i32::MIN {
@@ -728,18 +555,11 @@ fn overlap_align(
             score: 0,
         });
     }
+    let align_frag = traceback(&data, max_col as usize, max_row as usize, false, false);
 
-    let final_max_col = if max_col >= 0 { max_col as usize } else { 0 };
-    let final_max_row = if max_row >= 0 { max_row as usize } else { 0 };
-
-    // SAFETY: `dir_matrix` is fully initialized in the preceding loops.
-    let dir_matrix = unsafe { dir_matrix.assume_init() };
-    let align_frag = traceback(&dir_matrix, final_max_col, final_max_row, false, true);
-
-    let frag_count = align_frag.len();
     Ok(Alignment {
+        frag_count: align_frag.len(),
         align_frag: align_frag,
-        frag_count: frag_count,
         score: max_score,
     })
 }

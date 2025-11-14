@@ -374,6 +374,8 @@ def test_overlap_align_multi_fragment(multi_fragment_data: AlignmentInput) -> No
         alignment.align_frag,
         multi_fragment_data.alphabet,
     )
+    # AGAGAG-AG-AG
+    #     AGCAGCAGCA
     assert aligned_a == "AG-AG-AG"
     assert aligned_b == "AGCAGCAG"
 
@@ -510,6 +512,33 @@ def test_global_align_poly_strong_gap_penalty(poly_data: AlignmentInput) -> None
     assert aligned_seqb == "TTAAAAGGGGGGG"
 
 
+def test_global_alignment_long_gaps() -> None:
+    alphabet = "xyz"
+    seqa_str = "xxxxzzzz"
+    seqb_str = "yyyyzzzz"
+    seqa = _encode(seqa_str, alphabet)
+    seqb = _encode(seqb_str, alphabet)
+
+    score_matrix = np.array(
+        [
+            [2, -3, -3],  # x
+            [-3, 2, -3],  # y
+            [-3, -3, 5],  # z
+        ],
+        dtype=np.int32,
+    )
+
+    gap_open = -1
+    gap_extend = -1
+
+    alignment = global_align(seqa, seqb, score_matrix, gap_open, gap_extend)
+
+    assert alignment.score == 12
+    aligned_a, aligned_b = format_alignment_ascii(seqa, seqb, alignment.align_frag, alphabet)
+    assert aligned_a == "xxxx----zzzz"
+    assert aligned_b == "----yyyyzzzz"
+
+
 def test_local_global_align_poly(poly_data: AlignmentInput) -> None:
     alignment = local_global_align(
         poly_data.seqa,
@@ -585,5 +614,28 @@ def test_overlap_align_poly(poly_data: AlignmentInput) -> None:
         alignment.align_frag,
         poly_data.alphabet,
     )
+    # CCCCCCAACAA
+    #      TTAAAAGGGGGGG
     assert aligned_seqa == "CAACAA"
     assert aligned_seqb == "TTAAAA"
+
+
+def test_overlap_align_poly_flipped(poly_data: AlignmentInput) -> None:
+    alignment = overlap_align(
+        poly_data.seqb,
+        poly_data.seqa,
+        poly_data.score_matrix,
+        poly_data.gap_open,
+        poly_data.gap_extend,
+    )
+    assert alignment.score == 0
+    aligned_seqa, aligned_seqb = format_alignment_ascii(
+        poly_data.seqb,
+        poly_data.seqa,
+        alignment.align_frag,
+        poly_data.alphabet,
+    )
+    #      TTAAAAGGGGGGG
+    # CCCCCCAACAA
+    assert aligned_seqa == "TTAAAA"
+    assert aligned_seqb == "CAACAA"
