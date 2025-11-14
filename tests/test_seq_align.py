@@ -616,7 +616,6 @@ def test_overlap_align_poly(poly_data: AlignmentInput) -> None:
     )
     # CCCCCCAACAA
     #      TTAAAAGGGGGGG
-    print(alignment.align_frag)
     assert aligned_seqa == "CAACAA"
     assert aligned_seqb == "TTAAAA"
 

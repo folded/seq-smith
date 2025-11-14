@@ -185,13 +185,13 @@ impl AlignmentData {
 
     #[inline(always)]
     fn update_gaps(&mut self, row: usize, col: usize, score: i32, params: &AlignmentParams) {
-        if score + params.gap_open >= self.vgap_score + params.gap_extend {
+        if score.saturating_add(params.gap_open) >= self.vgap_score.saturating_add(params.gap_extend) {
             self.vgap_score = score.saturating_add(params.gap_open);
             self.vgap_pos = row as i32;
         } else {
             self.vgap_score = self.vgap_score.saturating_add(params.gap_extend);
         }
-        if score + params.gap_open >= self.hgap_score[row] + params.gap_extend {
+        if score.saturating_add(params.gap_open) >= self.hgap_score[row].saturating_add(params.gap_extend) {
             self.hgap_score[row] = score.saturating_add(params.gap_open);
             self.hgap_pos[row] = col as i32;
         } else {
