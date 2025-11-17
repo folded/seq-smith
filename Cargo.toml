@@ -9,6 +9,9 @@ numpy = "0.27.0"
 pyo3 = { version = "0.27.0", features = ["extension-module", "generate-import-lib"] }
 pyo3-stub-gen = "0.17.1"
 
+[build-dependencies]
+pyo3-build-config = "0.27.1"
+
 [lib]
 name = "_seq_smith"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]

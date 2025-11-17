@@ -76,4 +76,3 @@ known-first-party = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
-exclude = [ "docs" ]
