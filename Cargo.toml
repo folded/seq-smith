@@ -1,5 +1,5 @@
 [package]
-name = "seq_align"
+name = "seq_smith"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,5 +9,5 @@ numpy = "0.21.0"
 ndarray = "0.15"
 
 [lib]
-name = "seq_align"
+name = "_seq_smith"
 crate-type = ["cdylib"]

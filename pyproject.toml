@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "seq-align"
+name = "seq-smith"
 version = "0.1.0"
 authors = [
     { name = "Your Name", email = "tobias.sargeant@gmail.com" },
@@ -32,15 +32,19 @@ dependencies = [
 dev = [
     "pytest>=8.4.1",
     "ruff",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "myst-parser",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/folded/seq-align"
-"Bug Tracker" = "https://github.com/folded/seq-align/issues"
+"Homepage" = "https://github.com/folded/seq-smith"
+"Bug Tracker" = "https://github.com/folded/seq-smith/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-manifest-path = "seq-align/Cargo.toml"
+manifest-path = "Cargo.toml"
+module-name = "seq_smith._seq_smith"
 
 [tool.ruff]
 line-length = 120

@@ -102,7 +102,7 @@ def convert_c_alignment_to_py_alignment(
     return Alignment(score, frag_count, py_align_frags)
 
 
-# Fixtures from test_seq_align.py
+# Fixtures from test_seq_smith.py
 @pytest.fixture
 def common_data() -> AlignParams:
     alphabet = "ACGT"

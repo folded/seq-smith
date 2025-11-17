@@ -3,6 +3,7 @@ use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
+/// Represents the type of an alignment fragment.
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum FragType {
@@ -11,6 +12,13 @@ enum FragType {
     Match = 2,
 }
 
+/// Represents a single fragment within a sequence alignment.
+///
+/// Args:
+///     frag_type (FragType): The type of the fragment (e.g., Match, AGap, BGap).
+///     sa_start (int): The starting position in sequence A.
+///     sb_start (int): The starting position in sequence B.
+///     len (int): The length of the fragment.
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct AlignFrag {
@@ -51,6 +59,12 @@ impl AlignFrag {
     }
 }
 
+/// Represents a complete sequence alignment.
+///
+/// Args:
+///     align_frag (list[AlignFrag]): A list of alignment fragments.
+///     frag_count (int): The number of fragments in the alignment.
+///     score (int): The total score of the alignment.
 #[pyclass]
 #[derive(Debug, Clone)]
 struct Alignment {
@@ -83,6 +97,27 @@ impl<'a> AlignmentParams<'a> {
         if seqa.is_empty() || seqb.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Input sequences cannot be empty.",
+            ));
+        }
+        if score_matrix.ndim() != 2 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Score matrix must be 2-dimensional.",
+            ));
+        }
+        let (rows, cols) = score_matrix.dim();
+        if rows != cols {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Score matrix must be square.",
+            ));
+        }
+        if gap_open >= 0 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Gap open penalty must be negative.",
+            ));
+        }
+        if gap_extend >= 0 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Gap extend penalty must be negative.",
             ));
         }
         Ok(Self {
@@ -336,6 +371,23 @@ fn traceback(
     result
 }
 
+/// Performs a local alignment between two sequences using the Smith-Waterman algorithm.
+///
+/// Args:
+///     seqa (bytes): The first sequence as a byte array.
+///     seqb (bytes): The second sequence as a byte array.
+///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
+///     gap_open (int): The penalty for opening a gap. Must be negative.
+///     gap_extend (int): The penalty for extending a gap. Must be negative.
+///
+/// Raises:
+///     ValueError: If any of the following are true:
+///         * input sequences are empty
+///         * gap penalties are not negative.
+///         * score matrix is not 2-dimensional and square.
+///
+/// Returns:
+///     Alignment: An Alignment object containing the score and alignment fragments.
 #[pyfunction]
 fn local_align(
     seqa: &[u8],
@@ -393,6 +445,23 @@ fn local_align(
     })
 }
 
+/// Performs a global alignment between two sequences using the Needleman-Wunsch algorithm.
+///
+/// Args:
+///     seqa (bytes): The first sequence as a byte array.
+///     seqb (bytes): The second sequence as a byte array.
+///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
+///     gap_open (int): The penalty for opening a gap. Must be negative.
+///     gap_extend (int): The penalty for extending a gap. Must be negative.
+///
+/// Raises:
+///     ValueError: If any of the following are true:
+///         * input sequences are empty
+///         * gap penalties are not negative.
+///         * score matrix is not 2-dimensional and square.
+///
+/// Returns:
+///     Alignment: An Alignment object containing the score and alignment fragments.
 #[pyfunction]
 fn global_align(
     seqa: &[u8],
@@ -442,6 +511,24 @@ fn global_align(
     })
 }
 
+/// Performs a local-global alignment. This alignment finds the best local alignment of `seqa`
+/// within `seqb`, but `seqb` must be aligned globally.
+///
+/// Args:
+///     seqa (bytes): The first sequence as a byte array.
+///     seqb (bytes): The second sequence as a byte array.
+///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
+///     gap_open (int): The penalty for opening a gap. Must be negative.
+///     gap_extend (int): The penalty for extending a gap. Must be negative.
+///
+/// Raises:
+///     ValueError: If any of the following are true:
+///         * input sequences are empty
+///         * gap penalties are not negative.
+///         * score matrix is not 2-dimensional and square.
+///
+/// Returns:
+///     Alignment: An Alignment object containing the score and alignment fragments.
 #[pyfunction]
 fn local_global_align(
     seqa: &[u8],
@@ -493,6 +580,26 @@ fn local_global_align(
     })
 }
 
+/// Performs an overlap alignment between two sequences.
+///
+/// This alignment type does not penalize gaps at the start or end of either sequence,
+/// making it suitable for finding overlaps between sequences.
+///
+/// Args:
+///     seqa (bytes): The first sequence as a byte array.
+///     seqb (bytes): The second sequence as a byte array.
+///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
+///     gap_open (int): The penalty for opening a gap. Must be negative.
+///     gap_extend (int): The penalty for extending a gap. Must be negative.
+///
+/// Raises:
+///     ValueError: If any of the following are true:
+///         * input sequences are empty
+///         * gap penalties are not negative.
+///         * score matrix is not 2-dimensional and square.
+///
+/// Returns:
+///     Alignment: An Alignment object containing the score and alignment fragments.
 #[pyfunction]
 fn overlap_align(
     seqa: &[u8],
@@ -565,11 +672,11 @@ fn overlap_align(
 }
 
 #[pymodule]
-fn seq_align(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(local_align, m)?)?;
-    m.add_function(wrap_pyfunction!(global_align, m)?)?;
-    m.add_function(wrap_pyfunction!(local_global_align, m)?)?;
-    m.add_function(wrap_pyfunction!(overlap_align, m)?)?;
+fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_wrapped(wrap_pyfunction!(local_align))?;
+    m.add_wrapped(wrap_pyfunction!(global_align))?;
+    m.add_wrapped(wrap_pyfunction!(local_global_align))?;
+    m.add_wrapped(wrap_pyfunction!(overlap_align))?;
     m.add_class::<Alignment>()?;
     m.add_class::<AlignFrag>()?;
     m.add_class::<FragType>()?;
