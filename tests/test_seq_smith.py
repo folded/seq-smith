@@ -13,6 +13,7 @@ from seq_smith import (
     decode,
     make_score_matrix,
     format_alignment_ascii,
+    generate_cigar,
 )
 
 
@@ -551,3 +552,32 @@ def test_overlap_align_poly_flipped(poly_data: AlignmentInput) -> None:
     # CCCCCCAACAA
     assert aligned_seqa == "TTAAAA"
     assert aligned_seqb == "CAACAA"
+
+
+def test_generate_cigar_simple(common_data: AlignmentInput) -> None:
+    seqa = encode("ACGT", common_data.alphabet)
+    seqb = encode("ACGT", common_data.alphabet)
+    alignment = global_align(
+        seqa,
+        seqb,
+        common_data.score_matrix,
+        common_data.gap_open,
+        common_data.gap_extend,
+    )
+    cigar = generate_cigar(alignment)
+    assert cigar == "4M"
+
+
+def test_generate_cigar_with_gap(common_data: AlignmentInput) -> None:
+    seqa = encode("A", common_data.alphabet)
+    seqb = encode("AC", common_data.alphabet)
+    alignment = global_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+    cigar = generate_cigar(alignment)
+    assert cigar == "1M1I" # A- vs AC, so A matches, then C is an insertion in seqB (query)
+
+def test_generate_cigar_with_deletion(common_data: AlignmentInput) -> None:
+    seqa = encode("AC", common_data.alphabet)
+    seqb = encode("A", common_data.alphabet)
+    alignment = global_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
+    cigar = generate_cigar(alignment)
+    assert cigar == "1M1D" # AC vs A-, so A matches, then C is a deletion in seqB (query)

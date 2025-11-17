@@ -7,7 +7,7 @@ from ._seq_smith import (
     AlignFrag,
     FragType,
 )
-from .python_utils import make_score_matrix, encode, decode, format_alignment_ascii
+from .python_utils import make_score_matrix, encode, decode, format_alignment_ascii, generate_cigar
 
 __all__ = [
     "local_align",
@@ -21,4 +21,5 @@ __all__ = [
     "encode",
     "decode",
     "format_alignment_ascii",
+    "generate_cigar",
 ]
