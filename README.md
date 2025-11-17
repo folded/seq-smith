@@ -102,7 +102,7 @@ from seq_smith import global_align, make_score_matrix, encode
 alphabet = "GATTACA"
 score_matrix = make_score_matrix(alphabet, 2, -1)
 seqa = encode("GATTACA", alphabet)
-seqb = encode("GCATGCU", alphabet)
+seqb = encode("GCATGCA", alphabet)
 
 alignment = global_align(seqa, seqb, score_matrix, -2, -1)
 # Expected score: 0
