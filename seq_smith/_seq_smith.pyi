@@ -9,7 +9,6 @@ import numpy as np
 
 @typing.final
 class AlignFrag:
-
     @property
     def frag_type(self) -> FragType: ...
     @frag_type.setter
@@ -23,7 +22,6 @@ class AlignFrag:
 
 @typing.final
 class Alignment:
-
     @property
     def align_frag(self) -> builtins.list[AlignFrag]: ...
     @property
@@ -33,20 +31,35 @@ class Alignment:
 
 @typing.final
 class FragType(enum.Enum):
-
     AGap = ...
     BGap = ...
     Match = ...
 
-def global_align(seqa: bytes, seqb: bytes, score_matrix: np.typing.NDArray[np.int32], gap_open: builtins.int, gap_extend: builtins.int) -> Alignment:
-    ...
-
-def local_align(seqa: bytes, seqb: bytes, score_matrix: np.typing.NDArray[np.int32], gap_open: builtins.int, gap_extend: builtins.int) -> Alignment:
-    ...
-
-def local_global_align(seqa: bytes, seqb: bytes, score_matrix: np.typing.NDArray[np.int32], gap_open: builtins.int, gap_extend: builtins.int) -> Alignment:
-    ...
-
-def overlap_align(seqa: bytes, seqb: bytes, score_matrix: np.typing.NDArray[np.int32], gap_open: builtins.int, gap_extend: builtins.int) -> Alignment:
-    ...
-
+def global_align(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+) -> Alignment: ...
+def local_align(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+) -> Alignment: ...
+def local_global_align(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+) -> Alignment: ...
+def overlap_align(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+) -> Alignment: ...
