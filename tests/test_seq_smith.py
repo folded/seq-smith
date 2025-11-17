@@ -436,9 +436,14 @@ def test_global_alignment_long_gaps() -> None:
     seqa = encode(seqa_str, alphabet)
     seqb = encode(seqb_str, alphabet)
 
-    score_matrix = make_score_matrix(alphabet, 5, -3)
-    score_matrix[0, 1] = -3  # x vs y
-    score_matrix[1, 0] = -3  # y vs x
+    score_matrix = np.array(
+        [
+            [2, -3, -3],  # x
+            [-3, 2, -3],  # y
+            [-3, -3, 5],  # z
+        ],
+        dtype=np.int32,
+    )
 
     gap_open = -1
     gap_extend = -1
