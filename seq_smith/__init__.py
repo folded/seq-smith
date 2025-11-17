@@ -7,7 +7,7 @@ from ._seq_smith import (
     local_global_align,
     overlap_align,
 )
-from .python_utils import decode, encode, format_alignment_ascii, make_score_matrix
+from .python_utils import decode, encode, format_alignment_ascii, generate_cigar, make_score_matrix
 
 __all__ = [
     "AlignFrag",
@@ -16,6 +16,7 @@ __all__ = [
     "decode",
     "encode",
     "format_alignment_ascii",
+    "generate_cigar",
     "global_align",
     "local_align",
     "local_global_align",

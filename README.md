@@ -88,6 +88,26 @@ print(decoded_seq)
 # Output: AGCT
 ```
 
+### `generate_cigar(alignment)`
+
+Generates a CIGAR string from an Alignment object.
+
+**Example:**
+
+```python
+from seq_smith import global_align, make_score_matrix, encode, generate_cigar
+
+alphabet = "ACGT"
+score_matrix = make_score_matrix(alphabet, match_score=1, mismatch_score=-1)
+seqa = encode("ACTTTTGT", alphabet)
+seqb = encode("AGCT", alphabet)
+alignment = global_align(seqa, seqb, score_matrix, -2, -1)
+
+cigar_string = generate_cigar(alignment)
+print(cigar_string)
+# Expected output: 1M4D3M
+```
+
 ## Alignment Types
 
 ### Global Alignment (`global_align`)

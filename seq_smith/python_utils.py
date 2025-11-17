@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._seq_smith import AlignFrag, FragType
+from ._seq_smith import AlignFrag, Alignment, FragType
 
 
 def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int) -> np.ndarray:
@@ -86,3 +86,28 @@ def format_alignment_ascii(
                 aligned_seqb_list.append("-" * frag.len)
 
     return "".join(aligned_seqa_list), "".join(aligned_seqb_list)
+
+
+def generate_cigar(alignment: Alignment) -> str:
+    """
+    Generates a CIGAR string from an Alignment object.
+
+    Args:
+        alignment (Alignment): An Alignment object representing the alignment
+          of seqa (the reference) and seqb (the query).
+
+    Returns:
+        str: The CIGAR string.
+    """
+    cigar_parts = []
+    for frag in alignment.align_frag:
+        op = ""
+        match frag.frag_type:
+            case FragType.Match:
+                op = "M"
+            case FragType.AGap:
+                op = "I"  # Insertion in the query relative to the reference.
+            case FragType.BGap:
+                op = "D"  # Deletion in the query relative to the reference.
+        cigar_parts.append(f"{frag.len}{op}")
+    return "".join(cigar_parts)
