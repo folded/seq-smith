@@ -2,51 +2,18 @@ import dataclasses
 
 import numpy as np
 import pytest
-from seq_align import (
+from seq_smith import (
     AlignFrag,
     FragType,
     global_align,
     local_align,
     local_global_align,
     overlap_align,
+    encode,
+    decode,
+    make_score_matrix,
+    format_alignment_ascii,
 )
-
-
-def _encode(seq: str, alphabet: str) -> bytes:
-    """Encode a sequence using the provided alphabet."""
-    char_to_index = {char: idx for idx, char in enumerate(alphabet)}
-    return bytes(char_to_index[char] for char in seq)
-
-
-def _decode(encoded_seq: bytes, alphabet: str) -> str:
-    """Decode a byte-encoded sequence back to string using the provided alphabet."""
-    return "".join(alphabet[b] for b in encoded_seq)
-
-
-def format_alignment_ascii(
-    seqa_bytes: bytes,
-    seqb_bytes: bytes,
-    align_frags: list[AlignFrag],
-    alphabet: str,
-) -> tuple[str, str]:
-    seqa = _decode(seqa_bytes, alphabet)
-    seqb = _decode(seqb_bytes, alphabet)
-    aligned_seqa_list = []
-    aligned_seqb_list = []
-
-    for frag in align_frags:
-        match frag.frag_type:
-            case FragType.Match:
-                aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
-                aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
-            case FragType.AGap:
-                aligned_seqa_list.append("-" * frag.len)
-                aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
-            case FragType.BGap:
-                aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
-                aligned_seqb_list.append("-" * frag.len)
-
-    return "".join(aligned_seqa_list), "".join(aligned_seqb_list)
 
 
 @dataclasses.dataclass
@@ -54,31 +21,18 @@ class AlignmentInput:
     alphabet: str
     seqa: bytes
     seqb: bytes
-    alpha_len: int
     score_matrix: np.ndarray
     gap_open: int
     gap_extend: int
-
-    def encode(self, seq: str) -> bytes:
-        return _encode(seq, self.alphabet)
 
 
 @pytest.fixture
 def common_data() -> AlignmentInput:
     alphabet = "ACGT"
-    alpha_len = len(alphabet)
-    seqa = _encode("ACGT", alphabet)
-    seqb = _encode("AGCT", alphabet)
+    seqa = encode("ACGT", alphabet)
+    seqb = encode("AGCT", alphabet)
 
-    score_matrix = np.array(
-        [
-            [1, -1, -1, -1],
-            [-1, 1, -1, -1],
-            [-1, -1, 1, -1],
-            [-1, -1, -1, 1],
-        ],
-        dtype=np.int32,
-    )
+    score_matrix = make_score_matrix(alphabet, 1, -1)
     gap_open = -2
     gap_extend = -1
 
@@ -86,7 +40,6 @@ def common_data() -> AlignmentInput:
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
@@ -96,26 +49,16 @@ def common_data() -> AlignmentInput:
 @pytest.fixture
 def complex_data() -> AlignmentInput:
     alphabet = "ACGT"
-    alpha_len = len(alphabet)
-    seqa = _encode("GAATTCAGTTA", alphabet)
-    seqb = _encode("GGATCGA", alphabet)
+    seqa = encode("GAATTCAGTTA", alphabet)
+    seqb = encode("GGATCGA", alphabet)
 
-    score_matrix = np.array(
-        [
-            [2, -1, -1, -1],
-            [-1, 2, -1, -1],
-            [-1, -1, 2, -1],
-            [-1, -1, -1, 2],
-        ],
-        dtype=np.int32,
-    )
+    score_matrix = make_score_matrix(alphabet, 2, -1)
     gap_open = -3
     gap_extend = -1
     return AlignmentInput(
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
@@ -125,27 +68,17 @@ def complex_data() -> AlignmentInput:
 @pytest.fixture
 def local_global_test_data() -> AlignmentInput:
     alphabet = "ACGTX"
-    alpha_len = len(alphabet)
-    seqa = _encode("XACGTX", alphabet)
-    seqb = _encode("ACGT", alphabet)
+    seqa = encode("XACGTX", alphabet)
+    seqb = encode("ACGT", alphabet)
 
-    score_matrix = np.array(
-        [
-            [1, -1, -1, -1, -1],  # A
-            [-1, 1, -1, -1, -1],  # C
-            [-1, -1, 1, -1, -1],  # G
-            [-1, -1, -1, 1, -1],  # T
-            [-1, -1, -1, -1, 0],  # X
-        ],
-        dtype=np.int32,
-    )
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+    score_matrix[4, 4] = 0  # X vs X
     gap_open = -2
     gap_extend = -1
     return AlignmentInput(
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
@@ -155,8 +88,8 @@ def local_global_test_data() -> AlignmentInput:
 def test_global_align_simple(common_data: AlignmentInput) -> None:
     # This test was flawed. The original seqb was "AGCT", but the expected
     # fragments described a perfect match. Correcting seqb to "ACGT".
-    seqa = common_data.encode("ACGT")
-    seqb = common_data.encode("ACGT")
+    seqa = encode("ACGT", common_data.alphabet)
+    seqb = encode("ACGT", common_data.alphabet)
     alignment = global_align(
         seqa,
         seqb,
@@ -172,8 +105,8 @@ def test_global_align_simple(common_data: AlignmentInput) -> None:
 
 
 def test_global_align_simple_gap(common_data: AlignmentInput) -> None:
-    seqa = common_data.encode("A")
-    seqb = common_data.encode("AC")
+    seqa = encode("A", common_data.alphabet)
+    seqb = encode("AC", common_data.alphabet)
     alignment = global_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
     assert alignment.score == -1
@@ -185,8 +118,8 @@ def test_global_align_simple_gap(common_data: AlignmentInput) -> None:
 def test_local_global_align_simple(common_data: AlignmentInput) -> None:
     # This test was flawed. The original seqb was "AGCT", but the expected
     # fragments described a perfect match. Correcting seqb to "ACGT".
-    seqa = common_data.encode("ACGT")
-    seqb = common_data.encode("ACGT")
+    seqa = encode("ACGT", common_data.alphabet)
+    seqb = encode("ACGT", common_data.alphabet)
     alignment = local_global_align(
         seqa,
         seqb,
@@ -224,8 +157,8 @@ def test_local_global_align_subsegment_global_seqb(local_global_test_data: Align
 def test_overlap_align_simple(common_data: AlignmentInput) -> None:
     # This test was flawed. The original seqb was "AGCT", but the expected
     # fragments described a perfect match. Correcting seqb to "ACGT".
-    seqa = common_data.encode("ACGT")
-    seqb = common_data.encode("ACGT")
+    seqa = encode("ACGT", common_data.alphabet)
+    seqb = encode("ACGT", common_data.alphabet)
     alignment = overlap_align(
         seqa,
         seqb,
@@ -241,8 +174,8 @@ def test_overlap_align_simple(common_data: AlignmentInput) -> None:
 
 
 def test_overlap_align_semi_global_overlap(common_data: AlignmentInput) -> None:
-    seqa = common_data.encode("ACGTACGT")
-    seqb = common_data.encode("CGTA")
+    seqa = encode("ACGTACGT", common_data.alphabet)
+    seqb = encode("CGTA", common_data.alphabet)
     alignment = overlap_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
 
     assert alignment.score == 4
@@ -255,19 +188,10 @@ def test_overlap_align_semi_global_overlap(common_data: AlignmentInput) -> None:
 @pytest.fixture
 def multi_fragment_data() -> AlignmentInput:
     alphabet = "ACGT"
-    alpha_len = len(alphabet)
-    seqa = _encode("AGAGAGAGAG", alphabet)
-    seqb = _encode("AGCAGCAGCA", alphabet)
+    seqa = encode("AGAGAGAGAG", alphabet)
+    seqb = encode("AGCAGCAGCA", alphabet)
 
-    score_matrix = np.array(
-        [
-            [1, -1, -1, -1],
-            [-1, 1, -1, -1],
-            [-1, -1, 1, -1],
-            [-1, -1, -1, 1],
-        ],
-        dtype=np.int32,
-    )
+    score_matrix = make_score_matrix(alphabet, 1, -1)
 
     gap_open = -1
     gap_extend = -1
@@ -275,7 +199,6 @@ def multi_fragment_data() -> AlignmentInput:
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
@@ -284,18 +207,16 @@ def multi_fragment_data() -> AlignmentInput:
 
 def test_local_align_perfect_match_subsegment() -> None:
     alphabet = "ACGTXYZW"
-    len(alphabet)
+    seqa = encode("XXXXXAGCTYYYYY", alphabet)
+    seqb = encode("ZZZAGCTWWW", alphabet)
 
-    seqa = _encode("XXXXXAGCTYYYYY", alphabet)
-    seqb = _encode("ZZZAGCTWWW", alphabet)
-
-    score_matrix = np.eye(8, 8, dtype=np.int32) * 2 - 1
+    score_matrix = make_score_matrix(alphabet, 2, -1)
 
     gap_open = -2
     gap_extend = -1
 
     alignment = local_align(seqa, seqb, score_matrix, gap_open, gap_extend)
-    assert alignment.score == 4
+    assert alignment.score == 8
     aligned_a, aligned_b = format_alignment_ascii(seqa, seqb, alignment.align_frag, alphabet)
     assert aligned_a == "AGCT"
     assert aligned_b == "AGCT"
@@ -436,11 +357,10 @@ def test_overlap_align_empty_seqb(common_data: AlignmentInput) -> None:
 @pytest.fixture
 def poly_data() -> AlignmentInput:
     alphabet = "ACGT"
-    alpha_len = len(alphabet)
-    seqa = _encode("CCCCCCAACAA", alphabet)
-    seqb = _encode("TTAAAAGGGGGGG", alphabet)
+    seqa = encode("CCCCCCAACAA", alphabet)
+    seqb = encode("TTAAAAGGGGGGG", alphabet)
 
-    score_matrix = np.eye(4, dtype=np.int32) * 2 - 1
+    score_matrix = make_score_matrix(alphabet, 1, -1)
 
     gap_open = -2
     gap_extend = -1
@@ -448,7 +368,6 @@ def poly_data() -> AlignmentInput:
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
@@ -516,17 +435,12 @@ def test_global_alignment_long_gaps() -> None:
     alphabet = "xyz"
     seqa_str = "xxxxzzzz"
     seqb_str = "yyyyzzzz"
-    seqa = _encode(seqa_str, alphabet)
-    seqb = _encode(seqb_str, alphabet)
+    seqa = encode(seqa_str, alphabet)
+    seqb = encode(seqb_str, alphabet)
 
-    score_matrix = np.array(
-        [
-            [2, -3, -3],  # x
-            [-3, 2, -3],  # y
-            [-3, -3, 5],  # z
-        ],
-        dtype=np.int32,
-    )
+    score_matrix = make_score_matrix(alphabet, 5, -3)
+    score_matrix[0, 1] = -3 # x vs y
+    score_matrix[1, 0] = -3 # y vs x
 
     gap_open = -1
     gap_extend = -1
@@ -561,11 +475,10 @@ def test_local_global_align_poly(poly_data: AlignmentInput) -> None:
 @pytest.fixture
 def poly_data_strong_gap_penalty() -> AlignmentInput:
     alphabet = "ACGT"
-    alpha_len = len(alphabet)
-    seqa = _encode("CCCCCCAACAACCCCCCC", alphabet)
-    seqb = _encode("TTAAAAGGGG", alphabet)
+    seqa = encode("CCCCCCAACAACCCCCCC", alphabet)
+    seqb = encode("TTAAAAGGGG", alphabet)
 
-    score_matrix = np.eye(4, dtype=np.int32) * 2 - 1
+    score_matrix = make_score_matrix(alphabet, 1, -1)
 
     gap_open = -100
     gap_extend = -100
@@ -573,7 +486,6 @@ def poly_data_strong_gap_penalty() -> AlignmentInput:
         alphabet=alphabet,
         seqa=seqa,
         seqb=seqb,
-        alpha_len=alpha_len,
         score_matrix=score_matrix,
         gap_open=gap_open,
         gap_extend=gap_extend,
