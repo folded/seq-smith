@@ -4,18 +4,14 @@ build:
   os: ubuntu-latest
   tools:
     python: "3.11"
-  commands:
-    - pip install .[dev]
 
 sphinx:
   configuration: docs/source/conf.py
 
 formats: all
 
-# Optional: Set the version of Python and other tools you might need
 python:
   install:
-    - requirements: requirements-dev.txt
     - method: pip
       path: .
       extra_requirements:
