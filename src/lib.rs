@@ -1,10 +1,13 @@
 use ndarray::{Array1, Array2, ArrayView2};
 use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use pyo3::wrap_pyfunction;
+use pyo3_stub_gen::{derive::*, define_stub_info_gatherer};
 
 /// Represents the type of an alignment fragment.
-#[pyclass]
+#[gen_stub_pyclass_enum]
+#[pyclass(eq)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum FragType {
     AGap = 0,
@@ -19,6 +22,7 @@ enum FragType {
 ///     sa_start (int): The starting position in sequence A.
 ///     sb_start (int): The starting position in sequence B.
 ///     len (int): The length of the fragment.
+#[gen_stub_pyclass]
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct AlignFrag {
@@ -65,6 +69,7 @@ impl AlignFrag {
 ///     align_frag (list[AlignFrag]): A list of alignment fragments.
 ///     frag_count (int): The number of fragments in the alignment.
 ///     score (int): The total score of the alignment.
+#[gen_stub_pyclass]
 #[pyclass]
 #[derive(Debug, Clone)]
 struct Alignment {
@@ -388,15 +393,16 @@ fn traceback(
 ///
 /// Returns:
 ///     Alignment: An Alignment object containing the score and alignment fragments.
+#[gen_stub_pyfunction]
 #[pyfunction]
-fn local_align(
-    seqa: &[u8],
-    seqb: &[u8],
+fn local_align<'py>(
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = 0;
@@ -462,15 +468,16 @@ fn local_align(
 ///
 /// Returns:
 ///     Alignment: An Alignment object containing the score and alignment fragments.
+#[gen_stub_pyfunction]
 #[pyfunction]
-fn global_align(
-    seqa: &[u8],
-    seqb: &[u8],
+fn global_align<'py>(
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
     let mut data = AlignmentData::new(&params);
 
     for row in 0..params.sb_len {
@@ -529,15 +536,16 @@ fn global_align(
 ///
 /// Returns:
 ///     Alignment: An Alignment object containing the score and alignment fragments.
+#[gen_stub_pyfunction]
 #[pyfunction]
-fn local_global_align(
-    seqa: &[u8],
-    seqb: &[u8],
+fn local_global_align<'py>(
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
@@ -600,10 +608,11 @@ fn local_global_align(
 ///
 /// Returns:
 ///     Alignment: An Alignment object containing the score and alignment fragments.
+#[gen_stub_pyfunction]
 #[pyfunction]
-fn overlap_align(
-    seqa: &[u8],
-    seqb: &[u8],
+fn overlap_align<'py>(
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     gap_open: i32,
     gap_extend: i32,
@@ -611,7 +620,7 @@ fn overlap_align(
     // An overlap alignment must start on the bottom or right edge of the DP matrix.
     // Gaps at the start are not penalized.
 
-    let params = AlignmentParams::new(seqa, seqb, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
@@ -682,3 +691,6 @@ fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FragType>()?;
     Ok(())
 }
+
+// Define a function to gather stub information
+define_stub_info_gatherer!(stub_info);

@@ -2,17 +2,15 @@ import dataclasses
 
 import numpy as np
 import pytest
+
 from seq_smith import (
-    AlignFrag,
-    FragType,
+    encode,
+    format_alignment_ascii,
     global_align,
     local_align,
     local_global_align,
-    overlap_align,
-    encode,
-    decode,
     make_score_matrix,
-    format_alignment_ascii,
+    overlap_align,
 )
 
 
@@ -439,8 +437,8 @@ def test_global_alignment_long_gaps() -> None:
     seqb = encode(seqb_str, alphabet)
 
     score_matrix = make_score_matrix(alphabet, 5, -3)
-    score_matrix[0, 1] = -3 # x vs y
-    score_matrix[1, 0] = -3 # y vs x
+    score_matrix[0, 1] = -3  # x vs y
+    score_matrix[1, 0] = -3  # y vs x
 
     gap_open = -1
     gap_extend = -1

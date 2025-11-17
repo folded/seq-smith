@@ -49,6 +49,7 @@ for frag in alignment.align_frag:
 Creates a scoring matrix for a given alphabet.
 
 **Example:**
+
 ```python
 from seq_smith import make_score_matrix
 
@@ -62,6 +63,7 @@ print(score_matrix)
 Encodes a sequence into a byte array using the provided alphabet.
 
 **Example:**
+
 ```python
 from seq_smith import encode
 
@@ -76,6 +78,7 @@ print(encoded_seq)
 Decodes a byte-encoded sequence back to a string using the provided alphabet.
 
 **Example:**
+
 ```python
 from seq_smith import decode
 

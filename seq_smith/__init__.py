@@ -1,24 +1,24 @@
 from ._seq_smith import (
-    local_align,
+    AlignFrag,
+    Alignment,
+    FragType,
     global_align,
+    local_align,
     local_global_align,
     overlap_align,
-    Alignment,
-    AlignFrag,
-    FragType,
 )
-from .python_utils import make_score_matrix, encode, decode, format_alignment_ascii
+from .python_utils import decode, encode, format_alignment_ascii, make_score_matrix
 
 __all__ = [
-    "local_align",
-    "global_align",
-    "local_global_align",
-    "overlap_align",
-    "Alignment",
     "AlignFrag",
+    "Alignment",
     "FragType",
-    "make_score_matrix",
-    "encode",
     "decode",
+    "encode",
     "format_alignment_ascii",
+    "global_align",
+    "local_align",
+    "local_global_align",
+    "make_score_matrix",
+    "overlap_align",
 ]

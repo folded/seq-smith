@@ -1,4 +1,5 @@
 import numpy as np
+
 from ._seq_smith import AlignFrag, FragType
 
 
