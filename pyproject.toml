@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "seq-smith"
 version = "0.1.0"
 authors = [
-    { name = "Your Name", email = "tobias.sargeant@gmail.com" },
+    { name = "Tobias Sargeant", email = "tobias.sargeant@gmail.com" },
 ]
 description = "A Rust-based sequence alignment library for Python."
 readme = "README.md"
