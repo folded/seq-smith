@@ -137,8 +137,8 @@ from seq_smith import local_global_align, make_score_matrix, encode
 
 alphabet = "ACGTX"
 score_matrix = make_score_matrix(alphabet, 2, -1)
-seqa = encode("ACGT", alphabet)
-seqb = encode("XACGTX", alphabet)
+seqa = encode("XACGTX", alphabet)
+seqb = encode("ACGT", alphabet)
 
 alignment = local_global_align(seqa, seqb, score_matrix, -2, -1)
 # Expected score: 8
