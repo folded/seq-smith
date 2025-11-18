@@ -76,3 +76,17 @@ known-first-party = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
+
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-*"
+skip = "*-musllinux*"
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]
+# repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64", "ARM64"]
