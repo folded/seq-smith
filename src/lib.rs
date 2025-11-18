@@ -376,33 +376,7 @@ fn traceback(
     result
 }
 
-/// Performs a local alignment between two sequences using the Smith-Waterman algorithm.
-///
-/// Args:
-///     seqa (bytes): The first sequence as a byte array.
-///     seqb (bytes): The second sequence as a byte array.
-///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
-///     gap_open (int): The penalty for opening a gap. Must be negative.
-///     gap_extend (int): The penalty for extending a gap. Must be negative.
-///
-/// Raises:
-///     ValueError: If any of the following are true:
-///         * input sequences are empty
-///         * gap penalties are not negative.
-///         * score matrix is not 2-dimensional and square.
-///
-/// Returns:
-///     Alignment: An Alignment object containing the score and alignment fragments.
-#[gen_stub_pyfunction]
-#[pyfunction]
-fn local_align<'py>(
-    seqa: &Bound<'py, PyBytes>,
-    seqb: &Bound<'py, PyBytes>,
-    score_matrix: PyReadonlyArray2<i32>,
-    gap_open: i32,
-    gap_extend: i32,
-) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+fn _local_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = 0;
@@ -451,7 +425,7 @@ fn local_align<'py>(
     })
 }
 
-/// Performs a global alignment between two sequences using the Needleman-Wunsch algorithm.
+/// Performs a local alignment between two sequences using the Smith-Waterman algorithm.
 ///
 /// Args:
 ///     seqa (bytes): The first sequence as a byte array.
@@ -470,7 +444,8 @@ fn local_align<'py>(
 ///     Alignment: An Alignment object containing the score and alignment fragments.
 #[gen_stub_pyfunction]
 #[pyfunction]
-fn global_align<'py>(
+fn local_align<'py>(
+    py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
     seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
@@ -478,6 +453,13 @@ fn global_align<'py>(
     gap_extend: i32,
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+
+    py.detach(|| {
+        _local_align_core(params)
+    })
+}
+
+fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     let mut data = AlignmentData::new(&params);
 
     for row in 0..params.sb_len {
@@ -518,8 +500,7 @@ fn global_align<'py>(
     })
 }
 
-/// Performs a local-global alignment. This alignment finds the best local alignment of `seqa`
-/// within `seqb`, but `seqb` must be aligned globally.
+/// Performs a global alignment between two sequences using the Needleman-Wunsch algorithm.
 ///
 /// Args:
 ///     seqa (bytes): The first sequence as a byte array.
@@ -538,7 +519,8 @@ fn global_align<'py>(
 ///     Alignment: An Alignment object containing the score and alignment fragments.
 #[gen_stub_pyfunction]
 #[pyfunction]
-fn local_global_align<'py>(
+fn global_align<'py>(
+    py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
     seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
@@ -546,6 +528,13 @@ fn local_global_align<'py>(
     gap_extend: i32,
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+
+    py.detach(|| {
+        _global_align_core(params)
+    })
+}
+
+fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
@@ -588,10 +577,8 @@ fn local_global_align<'py>(
     })
 }
 
-/// Performs an overlap alignment between two sequences.
-///
-/// This alignment type does not penalize gaps at the start or end of either sequence,
-/// making it suitable for finding overlaps between sequences.
+/// Performs a local-global alignment. This alignment finds the best local alignment of `seqa`
+/// within `seqb`, but `seqb` must be aligned globally.
 ///
 /// Args:
 ///     seqa (bytes): The first sequence as a byte array.
@@ -610,17 +597,25 @@ fn local_global_align<'py>(
 ///     Alignment: An Alignment object containing the score and alignment fragments.
 #[gen_stub_pyfunction]
 #[pyfunction]
-fn overlap_align<'py>(
+fn local_global_align<'py>(
+    py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
     seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+
+    py.detach(|| {
+        _local_global_align_core(params)
+    })
+}
+
+fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     // An overlap alignment must start on the bottom or right edge of the DP matrix.
     // Gaps at the start are not penalized.
 
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
     let mut data = AlignmentData::new(&params);
 
     let mut max_score = std::i32::MIN;
@@ -677,6 +672,43 @@ fn overlap_align<'py>(
         frag_count: align_frag.len(),
         align_frag: align_frag,
         score: max_score,
+    })
+}
+
+/// Performs an overlap alignment between two sequences.
+///
+/// This alignment type does not penalize gaps at the start or end of either sequence,
+/// making it suitable for finding overlaps between sequences.
+///
+/// Args:
+///     seqa (bytes): The first sequence as a byte array.
+///     seqb (bytes): The second sequence as a byte array.
+///     score_matrix (numpy.ndarray): A 2D numpy array representing the scoring matrix.
+///     gap_open (int): The penalty for opening a gap. Must be negative.
+///     gap_extend (int): The penalty for extending a gap. Must be negative.
+///
+/// Raises:
+///     ValueError: If any of the following are true:
+///         * input sequences are empty
+///         * gap penalties are not negative.
+///         * score matrix is not 2-dimensional and square.
+///
+/// Returns:
+///     Alignment: An Alignment object containing the score and alignment fragments.
+#[gen_stub_pyfunction]
+#[pyfunction]
+fn overlap_align<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
+    score_matrix: PyReadonlyArray2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+) -> PyResult<Alignment> {
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+
+    py.detach(|| {
+        _overlap_align_core(params)
     })
 }
 
