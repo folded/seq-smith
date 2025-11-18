@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2, ArrayView2};
+use ndarray::{Array1, Array2};
 use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -86,7 +86,7 @@ struct AlignmentParams<'a> {
     sb: &'a [u8],
     sa_len: usize,
     sb_len: usize,
-    score_matrix: ArrayView2<'a, i32>,
+    score_matrix: Array2<i32>,
     gap_open: i32,
     gap_extend: i32,
 }
@@ -95,7 +95,7 @@ impl<'a> AlignmentParams<'a> {
     fn new(
         seqa: &'a [u8],
         seqb: &'a [u8],
-        score_matrix: ArrayView2<'a, i32>,
+        score_matrix: Array2<i32>,
         gap_open: i32,
         gap_extend: i32,
     ) -> PyResult<Self> {
@@ -452,7 +452,7 @@ fn local_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _local_align_core(params)
@@ -527,7 +527,7 @@ fn global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _global_align_core(params)
@@ -605,7 +605,7 @@ fn local_global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _local_global_align_core(params)
@@ -705,7 +705,7 @@ fn overlap_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _overlap_align_core(params)
