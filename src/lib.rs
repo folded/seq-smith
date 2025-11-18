@@ -454,7 +454,7 @@ fn local_align<'py>(
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
-    py.detach(|| {
+    py.detach(move || {
         _local_align_core(params)
     })
 }
@@ -529,7 +529,7 @@ fn global_align<'py>(
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
-    py.detach(|| {
+    py.detach(move || {
         _global_align_core(params)
     })
 }
@@ -607,7 +607,7 @@ fn local_global_align<'py>(
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
-    py.detach(|| {
+    py.detach(move || {
         _local_global_align_core(params)
     })
 }
@@ -707,7 +707,7 @@ fn overlap_align<'py>(
 ) -> PyResult<Alignment> {
     let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
-    py.detach(|| {
+    py.detach(move || {
         _overlap_align_core(params)
     })
 }
