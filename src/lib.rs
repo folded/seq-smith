@@ -81,9 +81,9 @@ struct Alignment {
     score: i32,
 }
 
-struct AlignmentParams<'a> {
-    sa: &'a [u8],
-    sb: &'a [u8],
+struct AlignmentParams {
+    sa: Vec<u8>,
+    sb: Vec<u8>,
     sa_len: usize,
     sb_len: usize,
     score_matrix: Array2<i32>,
@@ -91,10 +91,10 @@ struct AlignmentParams<'a> {
     gap_extend: i32,
 }
 
-impl<'a> AlignmentParams<'a> {
+impl AlignmentParams {
     fn new(
-        seqa: &'a [u8],
-        seqb: &'a [u8],
+        seqa: Vec<u8>,
+        seqb: Vec<u8>,
         score_matrix: Array2<i32>,
         gap_open: i32,
         gap_extend: i32,
@@ -126,10 +126,10 @@ impl<'a> AlignmentParams<'a> {
             ));
         }
         Ok(Self {
-            sa: seqa,
-            sb: seqb,
             sa_len: seqa.len(),
             sb_len: seqb.len(),
+            sa: seqa,
+            sb: seqb,
             score_matrix,
             gap_open,
             gap_extend,
@@ -452,7 +452,7 @@ fn local_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _local_align_core(params)
@@ -527,7 +527,7 @@ fn global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _global_align_core(params)
@@ -605,7 +605,7 @@ fn local_global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _local_global_align_core(params)
@@ -705,7 +705,7 @@ fn overlap_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.extract()?, seqb.extract()?, score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
 
     py.detach(|| {
         _overlap_align_core(params)
