@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeAlias
+from typing import Any, TYPE_CHECKING, TypeAlias
 
 import numpy as np
 
@@ -116,7 +116,7 @@ lib.alignment_free.restype = None
 
 
 def _align_wrapper(
-    func: Callable[[bytes, int, bytes, int, int, np.ndarray, int, int], CAlignmentPtr],
+    func: Callable[[bytes, int, bytes, int, int, Any, int, int], CAlignmentPtr],
     params: AlignParams,
 ) -> CAlignmentPtr:
     c_score_matrix = (ctypes.c_int * (params.alpha_len * params.alpha_len))(*params.score_matrix.flatten())

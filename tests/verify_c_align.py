@@ -150,7 +150,7 @@ def multi_fragment_data() -> AlignParams:
 def test_c_local_align_simple(common_data: AlignParams) -> None:
     c_alignment_ptr = local_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 1
     assert alignment.frag_count == 1
     expected_frags = [
@@ -162,7 +162,7 @@ def test_c_local_align_simple(common_data: AlignParams) -> None:
 def test_c_global_align_simple(common_data: AlignParams) -> None:
     c_alignment_ptr = global_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 0
     assert alignment.frag_count == 1
     expected_frags = [
@@ -174,7 +174,7 @@ def test_c_global_align_simple(common_data: AlignParams) -> None:
 def test_c_local_global_align_simple(common_data: AlignParams) -> None:
     c_alignment_ptr = local_global_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 0
     assert alignment.frag_count == 1
     expected_frags = [
@@ -186,7 +186,7 @@ def test_c_local_global_align_simple(common_data: AlignParams) -> None:
 def test_c_align_simple(common_data: AlignParams) -> None:
     c_alignment_ptr = overlap_align(common_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 0
     assert alignment.frag_count == 1
     expected_frags = [
@@ -198,7 +198,7 @@ def test_c_align_simple(common_data: AlignParams) -> None:
 def test_c_local_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
     c_alignment_ptr = local_align(multi_fragment_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 4
     assert alignment.frag_count == 5
     expected_frags = [
@@ -214,7 +214,7 @@ def test_c_local_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
 def test_c_global_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
     c_alignment_ptr = global_align(multi_fragment_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 2
     assert alignment.frag_count == 8
     expected_frags = [
@@ -233,7 +233,7 @@ def test_c_global_align_multi_fragment(multi_fragment_data: AlignParams) -> None
 def test_c_local_global_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
     c_alignment_ptr = local_global_align(multi_fragment_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 4
     assert alignment.frag_count == 7
     expected_frags = [
@@ -251,7 +251,7 @@ def test_c_local_global_align_multi_fragment(multi_fragment_data: AlignParams) -
 def test_c_align_multi_fragment(multi_fragment_data: AlignParams) -> None:
     c_alignment_ptr = overlap_align(multi_fragment_data)
     alignment = convert_c_alignment_to_py_alignment(c_alignment_ptr)
-
+    assert alignment is not None
     assert alignment.score == 4
     assert alignment.frag_count == 5
     expected_frags = [
@@ -331,6 +331,7 @@ def test_local_align_perfect_match_subsegment() -> None:
     params = AlignParams(seqa, seqb, 8, score_matrix, gap_open, gap_extend)
     alignment = local_align(params)
     alignment = convert_c_alignment_to_py_alignment(alignment)
+    assert alignment is not None
     assert alignment.score == 4  # AGCT match
     assert alignment.frag_count == 1
     expected_frags = [
