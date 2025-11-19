@@ -6,6 +6,11 @@
 seq-smith documentation
 =======================
 
+.. image:: _static/seq-smith.svg
+   :width: 200px
+   :alt: seq-smith hex sticker
+   :align: center
+
 Welcome to the documentation for `seq-smith`, a Rust-based sequence alignment library for Python.
 
 .. toctree::

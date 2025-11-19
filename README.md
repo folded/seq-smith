@@ -1,5 +1,7 @@
 # seq-smith
 
+<img src="docs/source/_static/seq-smith.svg" alt="seq-smith" width=200>
+
 A Rust-based sequence alignment library for Python.
 
 ## Installation
