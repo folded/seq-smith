@@ -13,6 +13,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "10.12"
 
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +28,11 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            target: x86_64-apple-darwin
             override: true
+
+      - name: Add macos target
+        if: matrix.os == 'macos-latest'
+        run: rustup target add x86_64-apple-darwin
 
       - name: Install dependencies
         run: pip install cibuildwheel
