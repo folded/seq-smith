@@ -67,7 +67,6 @@ impl AlignmentFragment {
 ///
 /// Args:
 ///     fragments (list[AlignmentFragment]): A list of alignment fragments.
-///     frag_count (int): The number of fragments in the alignment.
 ///     score (int): The total score of the alignment.
 #[gen_stub_pyclass]
 #[pyclass]

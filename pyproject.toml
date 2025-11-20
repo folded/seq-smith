@@ -33,8 +33,8 @@ dev = [
     "myst-parser",
     "pytest>=8.4.1",
     "ruff",
-    "sphinx-rtd-theme",
     "sphinx",
+    "sphinx-rtd-theme",
     "twine",
 ]
 
