@@ -39,7 +39,7 @@ jobs:
         run: rustup target add x86_64-apple-darwin
 
       - name: Install dependencies
-        run: pip install cibuildwheel twine
+        run: pip install cibuildwheel
 
       - name: Build wheels
         run: cibuildwheel --output-dir wheelhouse
@@ -49,23 +49,57 @@ jobs:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
+  build_sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install maturin
+        run: pip install maturin
+      - name: Build sdist
+        run: maturin sdist --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
   upload_release_assets:
     name: Upload Assets to Release
     runs-on: ubuntu-latest
-    needs: [build_wheels]
-
+    needs: [build_wheels, build_sdist]
     permissions:
       contents: write
-
     steps:
-      - name: Download all wheels artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-
-      - name: Upload Wheels
+          merge-multiple: true
+      - name: Upload Wheels and sdist
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: artifacts/**/*.whl
+          files: artifacts/*
           overwrite_files: true
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build_wheels, build_sdist]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/seq-smith
+    permissions:
+      id-token: write # Required for trusted publishing
+    steps:
+      - name: Download all wheels and sdist
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

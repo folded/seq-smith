@@ -1,6 +1,6 @@
 # seq-smith
 
-<img src="docs/source/_static/seq-smith.svg" alt="seq-smith" width=200>
+<img src="https://raw.githubusercontent.com/folded/seq-smith/main/docs/source/_static/seq-smith.svg" alt="seq-smith" width=200>
 
 A Rust-based sequence alignment library for Python.
 
@@ -40,146 +40,17 @@ alignment = global_align(seqa, seqb, score_matrix, gap_open, gap_extend)
 print(f"Alignment score: {alignment.score}")
 
 # Print the alignment fragments
-for frag in alignment.align_frag:
+for frag in alignment.fragments:
     print(frag)
-```
-
-## Helper Functions
-
-### `make_score_matrix(alphabet, match_score, mismatch_score)`
-
-Creates a scoring matrix for a given alphabet.
-
-**Example:**
-
-```python
-from seq_smith import make_score_matrix
-
-alphabet = "ACGT"
-score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-1)
-print(score_matrix)
-```
-
-### `encode(seq, alphabet)`
-
-Encodes a sequence into a byte array using the provided alphabet.
-
-**Example:**
-
-```python
-from seq_smith import encode
-
-alphabet = "ACGT"
-encoded_seq = encode("AGCT", alphabet)
-print(encoded_seq)
-# Output: b'\x00\x02\x01\x03'
-```
-
-### `decode(encoded_seq, alphabet)`
-
-Decodes a byte-encoded sequence back to a string using the provided alphabet.
-
-**Example:**
-
-```python
-from seq_smith import decode
-
-alphabet = "ACGT"
-decoded_seq = decode(b'\x00\x02\x01\x03', alphabet)
-print(decoded_seq)
-# Output: AGCT
-```
-
-### `generate_cigar(alignment)`
-
-Generates a CIGAR string from an Alignment object.
-
-**Example:**
-
-```python
-from seq_smith import global_align, make_score_matrix, encode, generate_cigar
-
-alphabet = "ACGT"
-score_matrix = make_score_matrix(alphabet, match_score=1, mismatch_score=-1)
-seqa = encode("ACTTTTGT", alphabet)
-seqb = encode("AGCT", alphabet)
-alignment = global_align(seqa, seqb, score_matrix, -2, -1)
-
-cigar_string = generate_cigar(alignment)
-print(cigar_string)
-# Expected output: 1M4D3M
 ```
 
 ## Alignment Types
 
-### Global Alignment (`global_align`)
+`seq-smith` supports the following alignment strategies:
 
-Performs a global alignment between two sequences using the Needleman-Wunsch algorithm. This alignment type attempts to align every residue in both sequences.
+- **Global Alignment (`global_align`):** Uses the Needleman-Wunsch algorithm to align every residue in both sequences.
+- **Local Alignment (`local_align`):** Uses the Smith-Waterman algorithm to find the best-scoring local region of similarity.
+- **Local-Global Alignment (`local_global_align`):** Finds the best local alignment of the first sequence within the second, requiring the second sequence to be aligned globally.
+- **Overlap Alignment (`overlap_align`):** Does not penalize gaps at the start or end of either sequence, making it ideal for finding overlaps between sequences (e.g., in sequence assembly).
 
-**Example:**
-
-```python
-from seq_smith import global_align, make_score_matrix, encode
-
-alphabet = "GATTACA"
-score_matrix = make_score_matrix(alphabet, 2, -1)
-seqa = encode("GATTACA", alphabet)
-seqb = encode("GCATGCA", alphabet)
-
-alignment = global_align(seqa, seqb, score_matrix, -2, -1)
-# Expected score: 0
-```
-
-### Local Alignment (`local_align`)
-
-Performs a local alignment between two sequences using the Smith-Waterman algorithm. This alignment type finds the best-scoring local region of similarity between the two sequences.
-
-**Example:**
-
-```python
-from seq_smith import local_align, make_score_matrix, encode
-
-alphabet = "ACGTXYZW"
-score_matrix = make_score_matrix(alphabet, 2, -1)
-seqa = encode("XXXXXAGCTYYYYY", alphabet)
-seqb = encode("ZZZAGCTWWW", alphabet)
-
-alignment = local_align(seqa, seqb, score_matrix, -2, -1)
-# Expected score: 8 (for "AGCT")
-```
-
-### Local-Global Alignment (`local_global_align`)
-
-This alignment finds the best local alignment of `seqa` within `seqb`, but `seqb` must be aligned globally.
-
-**Example:**
-
-```python
-from seq_smith import local_global_align, make_score_matrix, encode
-
-alphabet = "ACGTX"
-score_matrix = make_score_matrix(alphabet, 2, -1)
-seqa = encode("XACGTX", alphabet)
-seqb = encode("ACGT", alphabet)
-
-alignment = local_global_align(seqa, seqb, score_matrix, -2, -1)
-# Expected score: 8
-```
-
-### Overlap Alignment (`overlap_align`)
-
-Performs an overlap alignment between two sequences. This alignment type does not penalize gaps at the start or end of either sequence, making it suitable for finding overlaps between sequences, such as in sequence assembly.
-
-**Example:**
-
-```python
-from seq_smith import overlap_align, make_score_matrix, encode
-
-alphabet = "ACGT"
-score_matrix = make_score_matrix(alphabet, 2, -1)
-seqa = encode("ACGTACGT", alphabet)
-seqb = encode("CGTA", alphabet)
-
-alignment = overlap_align(seqa, seqb, score_matrix, -2, -1)
-# Expected score: 8
-```
+[full documentation](https://seq-smith.readthedocs.io).
