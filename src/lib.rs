@@ -3,13 +3,13 @@ use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::wrap_pyfunction;
-use pyo3_stub_gen::{derive::*, define_stub_info_gatherer};
+use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
 
 /// Represents the type of an alignment fragment.
 #[gen_stub_pyclass_enum]
 #[pyclass(eq)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-enum FragType {
+enum FragmentType {
     AGap = 0,
     BGap = 1,
     Match = 2,
@@ -18,16 +18,16 @@ enum FragType {
 /// Represents a single fragment within a sequence alignment.
 ///
 /// Args:
-///     frag_type (FragType): The type of the fragment (e.g., Match, AGap, BGap).
+///     fragment_type (FragmentType): The type of the fragment (e.g., Match, AGap, BGap).
 ///     sa_start (int): The starting position in sequence A.
 ///     sb_start (int): The starting position in sequence B.
 ///     len (int): The length of the fragment.
 #[gen_stub_pyclass]
 #[pyclass]
 #[derive(PartialEq, Eq, Debug, Clone)]
-struct AlignFrag {
+struct AlignmentFragment {
     #[pyo3(get, set)]
-    frag_type: FragType,
+    fragment_type: FragmentType,
     #[pyo3(get)]
     sa_start: i32,
     #[pyo3(get)]
@@ -37,11 +37,11 @@ struct AlignFrag {
 }
 
 #[pymethods]
-impl AlignFrag {
+impl AlignmentFragment {
     #[new]
-    fn new(frag_type: FragType, sa_start: i32, sb_start: i32, len: i32) -> Self {
-        AlignFrag {
-            frag_type,
+    fn new(fragment_type: FragmentType, sa_start: i32, sb_start: i32, len: i32) -> Self {
+        AlignmentFragment {
+            fragment_type,
             sa_start,
             sb_start,
             len,
@@ -50,13 +50,13 @@ impl AlignFrag {
 
     fn __repr__(&self) -> String {
         format!(
-            "AlignFrag(frag_type={:?}, sa_start={}, sb_start={}, len={})",
-            self.frag_type, self.sa_start, self.sb_start, self.len
+            "AlignmentFragment(fragment_type={:?}, sa_start={}, sb_start={}, len={})",
+            self.fragment_type, self.sa_start, self.sb_start, self.len
         )
     }
 
     fn __eq__(&self, other: &Self) -> bool {
-        self.frag_type == other.frag_type
+        self.fragment_type == other.fragment_type
             && self.sa_start == other.sa_start
             && self.sb_start == other.sb_start
             && self.len == other.len
@@ -66,7 +66,7 @@ impl AlignFrag {
 /// Represents a complete sequence alignment.
 ///
 /// Args:
-///     align_frag (list[AlignFrag]): A list of alignment fragments.
+///     fragments (list[AlignmentFragment]): A list of alignment fragments.
 ///     frag_count (int): The number of fragments in the alignment.
 ///     score (int): The total score of the alignment.
 #[gen_stub_pyclass]
@@ -74,9 +74,7 @@ impl AlignFrag {
 #[derive(Debug, Clone)]
 struct Alignment {
     #[pyo3(get)]
-    align_frag: Vec<AlignFrag>,
-    #[pyo3(get)]
-    frag_count: usize,
+    fragments: Vec<AlignmentFragment>,
     #[pyo3(get)]
     score: i32,
 }
@@ -225,13 +223,17 @@ impl AlignmentData {
 
     #[inline(always)]
     fn update_gaps(&mut self, row: usize, col: usize, score: i32, params: &AlignmentParams) {
-        if score.saturating_add(params.gap_open) >= self.vgap_score.saturating_add(params.gap_extend) {
+        if score.saturating_add(params.gap_open)
+            >= self.vgap_score.saturating_add(params.gap_extend)
+        {
             self.vgap_score = score.saturating_add(params.gap_open);
             self.vgap_pos = row as i32;
         } else {
             self.vgap_score = self.vgap_score.saturating_add(params.gap_extend);
         }
-        if score.saturating_add(params.gap_open) >= self.hgap_score[row].saturating_add(params.gap_extend) {
+        if score.saturating_add(params.gap_open)
+            >= self.hgap_score[row].saturating_add(params.gap_extend)
+        {
             self.hgap_score[row] = score.saturating_add(params.gap_open);
             self.hgap_pos[row] = col as i32;
         } else {
@@ -301,7 +303,7 @@ fn traceback(
     s_row: usize,
     global_a: bool,
     global_b: bool,
-) -> Vec<AlignFrag> {
+) -> Vec<AlignmentFragment> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
@@ -310,8 +312,8 @@ fn traceback(
     while s_col >= 0 && s_row >= 0 {
         d_kind = data.dir_matrix[[s_col as usize, s_row as usize]].kind();
 
-        let mut temp = AlignFrag {
-            frag_type: FragType::Match,
+        let mut temp = AlignmentFragment {
+            fragment_type: FragmentType::Match,
             sa_start: 0,
             sb_start: 0,
             len: 0,
@@ -321,12 +323,12 @@ fn traceback(
             DirectionKind::Stop => break,
             DirectionKind::GapA(len) => {
                 s_row -= len;
-                temp.frag_type = FragType::AGap;
+                temp.fragment_type = FragmentType::AGap;
                 temp.len = len;
             }
             DirectionKind::GapB(len) => {
                 s_col -= len;
-                temp.frag_type = FragType::BGap;
+                temp.fragment_type = FragmentType::BGap;
                 temp.len = len;
             }
             DirectionKind::Match => {
@@ -345,7 +347,7 @@ fn traceback(
                         break;
                     }
                 }
-                temp.frag_type = FragType::Match;
+                temp.fragment_type = FragmentType::Match;
                 temp.len = count;
             }
         }
@@ -356,16 +358,16 @@ fn traceback(
 
     if !matches!(d_kind, DirectionKind::Stop) {
         if global_b && s_row >= 0 {
-            result.push(AlignFrag {
-                frag_type: FragType::AGap,
+            result.push(AlignmentFragment {
+                fragment_type: FragmentType::AGap,
                 sa_start: 0,
                 sb_start: 0,
                 len: s_row + 1,
             });
         }
         if global_a && s_col >= 0 {
-            result.push(AlignFrag {
-                frag_type: FragType::BGap,
+            result.push(AlignmentFragment {
+                fragment_type: FragmentType::BGap,
                 sa_start: 0,
                 sb_start: 0,
                 len: s_col + 1,
@@ -416,11 +418,10 @@ fn _local_align_core(params: AlignmentParams) -> PyResult<Alignment> {
         data.swap_scores();
     }
 
-    let align_frag = traceback(&data, max_col, max_row, false, false);
+    let fragments = traceback(&data, max_col, max_row, false, false);
 
     Ok(Alignment {
-        frag_count: align_frag.len(),
-        align_frag: align_frag,
+        fragments: fragments,
         score: max_score,
     })
 }
@@ -452,11 +453,15 @@ fn local_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(
+        seqa.as_bytes().to_vec(),
+        seqb.as_bytes().to_vec(),
+        score_matrix.as_array().into_owned(),
+        gap_open,
+        gap_extend,
+    )?;
 
-    py.detach(move || {
-        _local_align_core(params)
-    })
+    py.detach(move || _local_align_core(params))
 }
 
 fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -491,11 +496,10 @@ fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     }
 
     let final_score = data.prev_score[params.sb_len - 1];
-    let align_frag = traceback(&data, params.sa_len - 1, params.sb_len - 1, true, true);
+    let fragments = traceback(&data, params.sa_len - 1, params.sb_len - 1, true, true);
 
     Ok(Alignment {
-        frag_count: align_frag.len(),
-        align_frag: align_frag,
+        fragments: fragments,
         score: final_score,
     })
 }
@@ -527,11 +531,15 @@ fn global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(
+        seqa.as_bytes().to_vec(),
+        seqb.as_bytes().to_vec(),
+        score_matrix.as_array().into_owned(),
+        gap_open,
+        gap_extend,
+    )?;
 
-    py.detach(move || {
-        _global_align_core(params)
-    })
+    py.detach(move || _global_align_core(params))
 }
 
 fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -568,11 +576,10 @@ fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
         data.swap_scores();
     }
 
-    let align_frag = traceback(&data, max_col, max_row, false, true);
+    let fragments = traceback(&data, max_col, max_row, false, true);
 
     Ok(Alignment {
-        frag_count: align_frag.len(),
-        align_frag: align_frag,
+        fragments: fragments,
         score: max_score,
     })
 }
@@ -605,11 +612,15 @@ fn local_global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(
+        seqa.as_bytes().to_vec(),
+        seqb.as_bytes().to_vec(),
+        score_matrix.as_array().into_owned(),
+        gap_open,
+        gap_extend,
+    )?;
 
-    py.detach(move || {
-        _local_global_align_core(params)
-    })
+    py.detach(move || _local_global_align_core(params))
 }
 
 fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -661,16 +672,14 @@ fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
 
     if max_score == std::i32::MIN {
         return Ok(Alignment {
-            align_frag: Vec::new(),
-            frag_count: 0,
+            fragments: Vec::new(),
             score: 0,
         });
     }
-    let align_frag = traceback(&data, max_col as usize, max_row as usize, false, false);
+    let fragments = traceback(&data, max_col as usize, max_row as usize, false, false);
 
     Ok(Alignment {
-        frag_count: align_frag.len(),
-        align_frag: align_frag,
+        fragments: fragments,
         score: max_score,
     })
 }
@@ -705,11 +714,15 @@ fn overlap_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(seqa.as_bytes().to_vec(), seqb.as_bytes().to_vec(), score_matrix.as_array().into_owned(), gap_open, gap_extend)?;
+    let params = AlignmentParams::new(
+        seqa.as_bytes().to_vec(),
+        seqb.as_bytes().to_vec(),
+        score_matrix.as_array().into_owned(),
+        gap_open,
+        gap_extend,
+    )?;
 
-    py.detach(move || {
-        _overlap_align_core(params)
-    })
+    py.detach(move || _overlap_align_core(params))
 }
 
 #[pymodule]
@@ -719,8 +732,8 @@ fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(local_global_align))?;
     m.add_wrapped(wrap_pyfunction!(overlap_align))?;
     m.add_class::<Alignment>()?;
-    m.add_class::<AlignFrag>()?;
-    m.add_class::<FragType>()?;
+    m.add_class::<AlignmentFragment>()?;
+    m.add_class::<FragmentType>()?;
     Ok(())
 }
 

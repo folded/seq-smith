@@ -1,7 +1,7 @@
 from ._seq_smith import (
-    AlignFrag,
     Alignment,
-    FragType,
+    AlignmentFragment,
+    FragmentType,
     global_align,
     local_align,
     local_global_align,
@@ -10,9 +10,9 @@ from ._seq_smith import (
 from .python_utils import decode, encode, format_alignment_ascii, generate_cigar, make_score_matrix
 
 __all__ = [
-    "AlignFrag",
     "Alignment",
-    "FragType",
+    "AlignmentFragment",
+    "FragmentType",
     "decode",
     "encode",
     "format_alignment_ascii",

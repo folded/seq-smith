@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "seq-smith"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     { name = "Tobias Sargeant", email = "tobias.sargeant@gmail.com" },
 ]
@@ -30,11 +30,12 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy",
+    "myst-parser",
     "pytest>=8.4.1",
     "ruff",
-    "sphinx",
     "sphinx-rtd-theme",
-    "myst-parser",
+    "sphinx",
+    "twine",
 ]
 
 [project.urls]
