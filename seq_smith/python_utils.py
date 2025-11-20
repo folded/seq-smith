@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._seq_smith import AlignFrag, Alignment, FragType
+from ._seq_smith import Alignment, AlignmentFragment, FragmentType
 
 
 def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int) -> np.ndarray:
@@ -53,7 +53,7 @@ def decode(encoded_seq: bytes, alphabet: str) -> str:
 def format_alignment_ascii(
     seqa_bytes: bytes,
     seqb_bytes: bytes,
-    align_frags: list[AlignFrag],
+    fragments: list[AlignmentFragment],
     alphabet: str,
 ) -> tuple[str, str]:
     """
@@ -62,7 +62,7 @@ def format_alignment_ascii(
     Args:
         seqa_bytes (bytes): The first sequence as a byte array.
         seqb_bytes (bytes): The second sequence as a byte array.
-        align_frags (list[AlignFrag]): A list of alignment fragments.
+        fragments (list[AlignmentFragment]): A list of alignment fragments.
         alphabet (str): The alphabet used for encoding/decoding.
 
     Returns:
@@ -73,15 +73,15 @@ def format_alignment_ascii(
     aligned_seqa_list = []
     aligned_seqb_list = []
 
-    for frag in align_frags:
-        match frag.frag_type:
-            case FragType.Match:
+    for frag in fragments:
+        match frag.fragment_type:
+            case FragmentType.Match:
                 aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
                 aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
-            case FragType.AGap:
+            case FragmentType.AGap:
                 aligned_seqa_list.append("-" * frag.len)
                 aligned_seqb_list.append(seqb[frag.sb_start : frag.sb_start + frag.len])
-            case FragType.BGap:
+            case FragmentType.BGap:
                 aligned_seqa_list.append(seqa[frag.sa_start : frag.sa_start + frag.len])
                 aligned_seqb_list.append("-" * frag.len)
 
@@ -100,14 +100,14 @@ def generate_cigar(alignment: Alignment) -> str:
         str: The CIGAR string.
     """
     cigar_parts = []
-    for frag in alignment.align_frag:
+    for frag in alignment.fragments:
         op = ""
-        match frag.frag_type:
-            case FragType.Match:
+        match frag.fragment_type:
+            case FragmentType.Match:
                 op = "M"
-            case FragType.AGap:
+            case FragmentType.AGap:
                 op = "I"  # Insertion in the query relative to the reference.
-            case FragType.BGap:
+            case FragmentType.BGap:
                 op = "D"  # Deletion in the query relative to the reference.
         cigar_parts.append(f"{frag.len}{op}")
     return "".join(cigar_parts)
