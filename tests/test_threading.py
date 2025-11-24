@@ -1,5 +1,5 @@
-import numpy as np
 import pytest
+
 from seq_smith import (
     encode,
     global_align,
@@ -59,7 +59,7 @@ def test_align_many_vs_single(alignment_data, align_func, align_many_func):
 
 def test_threading_num_threads(alignment_data):
     seqa, seqbs, score_matrix, gap_open, gap_extend = alignment_data
-    
+
     # Test with specific number of threads
     actual = global_align_many(seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=2)
     assert len(actual) == len(seqbs)
@@ -67,6 +67,6 @@ def test_threading_num_threads(alignment_data):
 
 def test_empty_input(alignment_data):
     seqa, _, score_matrix, gap_open, gap_extend = alignment_data
-    
+
     actual = global_align_many(seqa, [], score_matrix, gap_open, gap_extend)
     assert actual == []
