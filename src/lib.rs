@@ -887,9 +887,9 @@ where
             .into_par_iter()
             .map(|seqb| {
                 let params = AlignmentParams::new(
-                    seqa.clone(),
-                    seqb,
-                    score_matrix.clone(),
+                    &seqa,
+                    &seqb,
+                    &score_matrix,
                     gap_open,
                     gap_extend,
                 )?;
