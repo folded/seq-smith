@@ -53,4 +53,31 @@ for frag in alignment.fragments:
 - **Local-Global Alignment (`local_global_align`):** Finds the best local alignment of the first sequence within the second, requiring the second sequence to be aligned globally.
 - **Overlap Alignment (`overlap_align`):** Does not penalize gaps at the start or end of either sequence, making it ideal for finding overlaps between sequences (e.g., in sequence assembly).
 
+## Multi-threaded Alignment
+
+`seq-smith` supports multi-threaded alignment for 1-vs-many scenarios. This is useful when you have a query sequence and want to align it against a large database of target sequences.
+
+Available functions:
+- `global_align_many`
+- `local_align_many`
+- `local_global_align_many`
+- `overlap_align_many`
+
+Example:
+
+```python
+from seq_smith import global_align_many
+
+# ... setup alphabet, score_matrix, gap penalties ...
+
+seqa = encode("ACGT", alphabet)
+seqbs = [encode("ACGT", alphabet), encode("AGCT", alphabet), encode("AAAA", alphabet)]
+
+# Align seqa against all sequences in seqbs in parallel
+alignments = global_align_many(seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=4)
+
+for aln in alignments:
+    print(aln.score)
+```
+
 [full documentation](https://seq-smith.readthedocs.io).

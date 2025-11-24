@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::wrap_pyfunction;
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
+use rayon::prelude::*;
 
 /// Represents the type of an alignment fragment.
 #[gen_stub_pyclass_enum]
@@ -452,15 +453,50 @@ fn local_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(
-        seqa.as_bytes().to_vec(),
-        seqb.as_bytes().to_vec(),
-        score_matrix.as_array().into_owned(),
-        gap_open,
-        gap_extend,
-    )?;
+    let seqa = seqa.as_bytes().to_vec();
+    let seqb = seqb.as_bytes().to_vec();
+    let score_matrix = score_matrix.as_array().into_owned();
 
-    py.detach(move || _local_align_core(params))
+    py.detach(move || {
+        let params = AlignmentParams::new(
+            seqa,
+            seqb,
+            score_matrix,
+            gap_open,
+            gap_extend,
+        )?;
+        _local_align_core(params)
+    })
+}
+
+/// Performs local alignment of one sequence against many sequences in parallel.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(signature = (seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=None))]
+fn local_align_many<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqbs: Vec<Bound<'py, PyBytes>>,
+    score_matrix: PyReadonlyArray2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+    num_threads: Option<usize>,
+) -> PyResult<Vec<Alignment>> {
+    let seqa = seqa.as_bytes().to_vec();
+    let seqbs: Vec<Vec<u8>> = seqbs.iter().map(|s| s.as_bytes().to_vec()).collect();
+    let score_matrix = score_matrix.as_array().into_owned();
+
+    py.detach(move || {
+        _align_many_core(
+            seqa,
+            seqbs,
+            score_matrix,
+            gap_open,
+            gap_extend,
+            num_threads,
+            _local_align_core,
+        )
+    })
 }
 
 fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -530,15 +566,50 @@ fn global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(
-        seqa.as_bytes().to_vec(),
-        seqb.as_bytes().to_vec(),
-        score_matrix.as_array().into_owned(),
-        gap_open,
-        gap_extend,
-    )?;
+    let seqa = seqa.as_bytes().to_vec();
+    let seqb = seqb.as_bytes().to_vec();
+    let score_matrix = score_matrix.as_array().into_owned();
 
-    py.detach(move || _global_align_core(params))
+    py.detach(move || {
+        let params = AlignmentParams::new(
+            seqa,
+            seqb,
+            score_matrix,
+            gap_open,
+            gap_extend,
+        )?;
+        _global_align_core(params)
+    })
+}
+
+/// Performs global alignment of one sequence against many sequences in parallel.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(signature = (seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=None))]
+fn global_align_many<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqbs: Vec<Bound<'py, PyBytes>>,
+    score_matrix: PyReadonlyArray2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+    num_threads: Option<usize>,
+) -> PyResult<Vec<Alignment>> {
+    let seqa = seqa.as_bytes().to_vec();
+    let seqbs: Vec<Vec<u8>> = seqbs.iter().map(|s| s.as_bytes().to_vec()).collect();
+    let score_matrix = score_matrix.as_array().into_owned();
+
+    py.detach(move || {
+        _align_many_core(
+            seqa,
+            seqbs,
+            score_matrix,
+            gap_open,
+            gap_extend,
+            num_threads,
+            _global_align_core,
+        )
+    })
 }
 
 fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -611,15 +682,50 @@ fn local_global_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(
-        seqa.as_bytes().to_vec(),
-        seqb.as_bytes().to_vec(),
-        score_matrix.as_array().into_owned(),
-        gap_open,
-        gap_extend,
-    )?;
+    let seqa = seqa.as_bytes().to_vec();
+    let seqb = seqb.as_bytes().to_vec();
+    let score_matrix = score_matrix.as_array().into_owned();
 
-    py.detach(move || _local_global_align_core(params))
+    py.detach(move || {
+        let params = AlignmentParams::new(
+            seqa,
+            seqb,
+            score_matrix,
+            gap_open,
+            gap_extend,
+        )?;
+        _local_global_align_core(params)
+    })
+}
+
+/// Performs local-global alignment of one sequence against many sequences in parallel.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(signature = (seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=None))]
+fn local_global_align_many<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqbs: Vec<Bound<'py, PyBytes>>,
+    score_matrix: PyReadonlyArray2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+    num_threads: Option<usize>,
+) -> PyResult<Vec<Alignment>> {
+    let seqa = seqa.as_bytes().to_vec();
+    let seqbs: Vec<Vec<u8>> = seqbs.iter().map(|s| s.as_bytes().to_vec()).collect();
+    let score_matrix = score_matrix.as_array().into_owned();
+
+    py.detach(move || {
+        _align_many_core(
+            seqa,
+            seqbs,
+            score_matrix,
+            gap_open,
+            gap_extend,
+            num_threads,
+            _local_global_align_core,
+        )
+    })
 }
 
 fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -713,16 +819,89 @@ fn overlap_align<'py>(
     gap_open: i32,
     gap_extend: i32,
 ) -> PyResult<Alignment> {
-    let params = AlignmentParams::new(
-        seqa.as_bytes().to_vec(),
-        seqb.as_bytes().to_vec(),
-        score_matrix.as_array().into_owned(),
-        gap_open,
-        gap_extend,
-    )?;
+    let seqa = seqa.as_bytes().to_vec();
+    let seqb = seqb.as_bytes().to_vec();
+    let score_matrix = score_matrix.as_array().into_owned();
 
-    py.detach(move || _overlap_align_core(params))
+    py.detach(move || {
+        let params = AlignmentParams::new(
+            seqa,
+            seqb,
+            score_matrix,
+            gap_open,
+            gap_extend,
+        )?;
+        _overlap_align_core(params)
+    })
 }
+
+/// Performs overlap alignment of one sequence against many sequences in parallel.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(signature = (seqa, seqbs, score_matrix, gap_open, gap_extend, num_threads=None))]
+fn overlap_align_many<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqbs: Vec<Bound<'py, PyBytes>>,
+    score_matrix: PyReadonlyArray2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+    num_threads: Option<usize>,
+) -> PyResult<Vec<Alignment>> {
+    let seqa = seqa.as_bytes().to_vec();
+    let seqbs: Vec<Vec<u8>> = seqbs.iter().map(|s| s.as_bytes().to_vec()).collect();
+    let score_matrix = score_matrix.as_array().into_owned();
+
+    py.detach(move || {
+        _align_many_core(
+            seqa,
+            seqbs,
+            score_matrix,
+            gap_open,
+            gap_extend,
+            num_threads,
+            _overlap_align_core,
+        )
+    })
+}
+
+fn _align_many_core<F>(
+    seqa: Vec<u8>,
+    seqbs: Vec<Vec<u8>>,
+    score_matrix: Array2<i32>,
+    gap_open: i32,
+    gap_extend: i32,
+    num_threads: Option<usize>,
+    align_func: F,
+) -> PyResult<Vec<Alignment>>
+where
+    F: Fn(AlignmentParams) -> PyResult<Alignment> + Sync + Send,
+{
+    if let Some(n) = num_threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n)
+            .build_global()
+            .ok(); // Ignore error if already initialized
+    }
+
+    let results: Result<Vec<Alignment>, PyErr> = seqbs
+        .into_par_iter()
+        .map(|seqb| {
+            let params = AlignmentParams::new(
+                seqa.clone(),
+                seqb,
+                score_matrix.clone(),
+                gap_open,
+                gap_extend,
+            )?;
+            align_func(params)
+        })
+        .collect();
+
+    results
+}
+
+
 
 #[pymodule]
 fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -730,6 +909,10 @@ fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(global_align))?;
     m.add_wrapped(wrap_pyfunction!(local_global_align))?;
     m.add_wrapped(wrap_pyfunction!(overlap_align))?;
+    m.add_wrapped(wrap_pyfunction!(local_align_many))?;
+    m.add_wrapped(wrap_pyfunction!(global_align_many))?;
+    m.add_wrapped(wrap_pyfunction!(local_global_align_many))?;
+    m.add_wrapped(wrap_pyfunction!(overlap_align_many))?;
     m.add_class::<Alignment>()?;
     m.add_class::<AlignmentFragment>()?;
     m.add_class::<FragmentType>()?;

@@ -3,9 +3,13 @@ from ._seq_smith import (
     AlignmentFragment,
     FragmentType,
     global_align,
+    global_align_many,
     local_align,
+    local_align_many,
     local_global_align,
+    local_global_align_many,
     overlap_align,
+    overlap_align_many,
 )
 from .python_utils import decode, encode, format_alignment_ascii, generate_cigar, make_score_matrix
 
@@ -18,8 +22,12 @@ __all__ = [
     "format_alignment_ascii",
     "generate_cigar",
     "global_align",
+    "global_align_many",
     "local_align",
+    "local_align_many",
     "local_global_align",
+    "local_global_align_many",
     "make_score_matrix",
     "overlap_align",
+    "overlap_align_many",
 ]
