@@ -877,28 +877,26 @@ fn _align_many_core<F>(
 where
     F: Fn(AlignmentParams) -> PyResult<Alignment> + Sync + Send,
 {
-    if let Some(n) = num_threads {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(n)
-            .build_global()
-            .ok(); // Ignore error if already initialized
-    }
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads.unwrap_or(0)) // 0 tells rayon to use a default number of threads
+        .build()
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create thread pool: {}", e)))?;
 
-    let results: Result<Vec<Alignment>, PyErr> = seqbs
-        .into_par_iter()
-        .map(|seqb| {
-            let params = AlignmentParams::new(
-                &seqa,
-                &seqb,
-                &score_matrix,
-                gap_open,
-                gap_extend,
-            )?;
-            align_func(params)
-        })
-        .collect();
-
-    results
+    pool.install(|| {
+        seqbs
+            .into_par_iter()
+            .map(|seqb| {
+                let params = AlignmentParams::new(
+                    seqa.clone(),
+                    seqb,
+                    score_matrix.clone(),
+                    gap_open,
+                    gap_extend,
+                )?;
+                align_func(params)
+            })
+            .collect()
+    })
 }
 
 
