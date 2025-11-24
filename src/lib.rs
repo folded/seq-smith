@@ -79,21 +79,21 @@ struct Alignment {
     score: i32,
 }
 
-struct AlignmentParams {
-    sa: Vec<u8>,
-    sb: Vec<u8>,
+struct AlignmentParams<'a> {
+    sa: &'a Vec<u8>,
+    sb: &'a Vec<u8>,
     sa_len: usize,
     sb_len: usize,
-    score_matrix: Array2<i32>,
+    score_matrix: &'a Array2<i32>,
     gap_open: i32,
     gap_extend: i32,
 }
 
-impl AlignmentParams {
+impl<'a> AlignmentParams<'a> {
     fn new(
-        seqa: Vec<u8>,
-        seqb: Vec<u8>,
-        score_matrix: Array2<i32>,
+        seqa: &'a Vec<u8>,
+        seqb: &'a Vec<u8>,
+        score_matrix: &'a Array2<i32>,
         gap_open: i32,
         gap_extend: i32,
     ) -> PyResult<Self> {
@@ -459,9 +459,9 @@ fn local_align<'py>(
 
     py.detach(move || {
         let params = AlignmentParams::new(
-            seqa,
-            seqb,
-            score_matrix,
+            &seqa,
+            &seqb,
+            &score_matrix,
             gap_open,
             gap_extend,
         )?;
@@ -572,9 +572,9 @@ fn global_align<'py>(
 
     py.detach(move || {
         let params = AlignmentParams::new(
-            seqa,
-            seqb,
-            score_matrix,
+            &seqa,
+            &seqb,
+            &score_matrix,
             gap_open,
             gap_extend,
         )?;
@@ -688,9 +688,9 @@ fn local_global_align<'py>(
 
     py.detach(move || {
         let params = AlignmentParams::new(
-            seqa,
-            seqb,
-            score_matrix,
+            &seqa,
+            &seqb,
+            &score_matrix,
             gap_open,
             gap_extend,
         )?;
@@ -825,9 +825,9 @@ fn overlap_align<'py>(
 
     py.detach(move || {
         let params = AlignmentParams::new(
-            seqa,
-            seqb,
-            score_matrix,
+            &seqa,
+            &seqb,
+            &score_matrix,
             gap_open,
             gap_extend,
         )?;
@@ -888,9 +888,9 @@ where
         .into_par_iter()
         .map(|seqb| {
             let params = AlignmentParams::new(
-                seqa.clone(),
-                seqb,
-                score_matrix.clone(),
+                &seqa,
+                &seqb,
+                &score_matrix,
                 gap_open,
                 gap_extend,
             )?;
