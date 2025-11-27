@@ -3,7 +3,7 @@ import numpy as np
 from ._seq_smith import Alignment, AlignmentFragment, FragmentType
 
 
-def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int, ambiguous:str = '', ambiguous_match_score: int | None = None) -> np.ndarray:
+def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int, *, ambiguous:str = '', ambiguous_match_score: int | None = None) -> np.ndarray:
     """
     Creates a scoring matrix for a given alphabet.
 
@@ -19,21 +19,24 @@ def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int, ambi
     """
     alpha_len = len(alphabet)
     score_matrix = np.full((alpha_len, alpha_len), mismatch_score, dtype=np.int32)
+    np.fill_diagonal(score_matrix, match_score)
     if ambiguous:
         if ambiguous_match_score is None:
-            # Only raise an error if ambiguous characters are actually present in the alphabet.
-            if any(char in alphabet for char in ambiguous):
-                raise ValueError(
-                    "ambiguous_match_score must be provided when ambiguous characters are in use."
-                )
+            raise ValueError(
+                "ambiguous_match_score and ambiguous must both be provided when ambiguous characters are in use."
+            )
+        elif not set(alphabet).issuperset(set(ambiguous)):
+            raise ValueError(
+                "all ambiguous characters must be included in the alphabet."
+            )
         else:
             ambiguous_chars = set(ambiguous)
             for i, char in enumerate(alphabet):
                 if char in ambiguous_chars:
                     score_matrix[i, :] = ambiguous_match_score
                     score_matrix[:, i] = ambiguous_match_score
-    np.fill_diagonal(score_matrix, match_score)
     return score_matrix
+
 
 def encode(seq: str, alphabet: str) -> bytes:
     """
