@@ -83,7 +83,6 @@ def test_stats_gap_b(common_data: AlignmentData) -> None:
     )
 
     assert alignment.stats.num_exact_matches == 1
-    assert alignment.stats.num_b_gaps >= 1
+    assert alignment.stats.num_b_gaps == 2
     assert alignment.stats.num_a_gaps == 0
-    # Length depends on exact alignment but should be sum
-    assert alignment.stats.length == alignment.stats.num_exact_matches + alignment.stats.num_b_gaps
+    assert alignment.stats.length == 3
