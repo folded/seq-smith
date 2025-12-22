@@ -64,11 +64,41 @@ impl AlignmentFragment {
     }
 }
 
+/// Represents detailed statistics about an alignment.
+#[gen_stub_pyclass]
+#[pyclass]
+#[derive(Debug, Clone, Copy, Default)]
+struct AlignmentStats {
+    #[pyo3(get)]
+    num_exact_matches: i32,
+    #[pyo3(get)]
+    num_positive_mismatches: i32,
+    #[pyo3(get)]
+    num_negative_mismatches: i32,
+    #[pyo3(get)]
+    num_a_gaps: i32,
+    #[pyo3(get)]
+    num_b_gaps: i32,
+}
+
+#[pymethods]
+impl AlignmentStats {
+    #[getter]
+    fn length(&self) -> i32 {
+        self.num_exact_matches
+            + self.num_positive_mismatches
+            + self.num_negative_mismatches
+            + self.num_a_gaps
+            + self.num_b_gaps
+    }
+}
+
 /// Represents a complete sequence alignment.
 ///
 /// Args:
 ///     fragments (list[AlignmentFragment]): A list of alignment fragments.
 ///     score (int): The total score of the alignment.
+///     stats (AlignmentStats): Statistics about the alignment.
 #[gen_stub_pyclass]
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -77,6 +107,8 @@ struct Alignment {
     fragments: Vec<AlignmentFragment>,
     #[pyo3(get)]
     score: i32,
+    #[pyo3(get)]
+    stats: AlignmentStats,
 }
 
 struct AlignmentParams<'a> {
@@ -299,12 +331,15 @@ impl Direction {
 
 fn traceback(
     data: &AlignmentData,
+    params: &AlignmentParams,
     s_col: usize,
     s_row: usize,
     global_a: bool,
     global_b: bool,
-) -> Vec<AlignmentFragment> {
+) -> (Vec<AlignmentFragment>, AlignmentStats) {
     let mut result = Vec::new();
+    let mut stats = AlignmentStats::default();
+
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
     let mut d_kind = DirectionKind::Match;
@@ -325,15 +360,31 @@ fn traceback(
                 s_row -= len;
                 temp.fragment_type = FragmentType::AGap;
                 temp.len = len;
+                stats.num_a_gaps += len;
             }
             DirectionKind::GapB(len) => {
                 s_col -= len;
                 temp.fragment_type = FragmentType::BGap;
                 temp.len = len;
+                stats.num_b_gaps += len;
             }
             DirectionKind::Match => {
                 let mut count = 0;
                 loop {
+                    // Statistics calculation
+                    let residue_a = params.sa[s_col as usize];
+                    let residue_b = params.sb[s_row as usize];
+                    if residue_a == residue_b {
+                        stats.num_exact_matches += 1;
+                    } else {
+                        let score = params.score_matrix[[residue_a as usize, residue_b as usize]];
+                        if score > 0 {
+                            stats.num_positive_mismatches += 1;
+                        } else {
+                            stats.num_negative_mismatches += 1;
+                        }
+                    }
+
                     s_col -= 1;
                     s_row -= 1;
                     count += 1;
@@ -364,6 +415,7 @@ fn traceback(
                 sb_start: 0,
                 len: s_row + 1,
             });
+            stats.num_a_gaps += s_row + 1;
         }
         if global_a && s_col >= 0 {
             result.push(AlignmentFragment {
@@ -372,10 +424,11 @@ fn traceback(
                 sb_start: 0,
                 len: s_col + 1,
             });
+            stats.num_b_gaps += s_col + 1;
         }
     }
     result.reverse();
-    result
+    (result, stats)
 }
 
 fn _local_align_core(params: AlignmentParams) -> PyResult<Alignment> {
@@ -418,11 +471,12 @@ fn _local_align_core(params: AlignmentParams) -> PyResult<Alignment> {
         data.swap_scores();
     }
 
-    let fragments = traceback(&data, max_col, max_row, false, false);
+    let (fragments, stats) = traceback(&data, &params, max_col, max_row, false, false);
 
     Ok(Alignment {
         fragments: fragments,
         score: max_score,
+        stats,
     })
 }
 
@@ -531,11 +585,13 @@ fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     }
 
     let final_score = data.prev_score[params.sb_len - 1];
-    let fragments = traceback(&data, params.sa_len - 1, params.sb_len - 1, true, true);
+    let (fragments, stats) =
+        traceback(&data, &params, params.sa_len - 1, params.sb_len - 1, true, true);
 
     Ok(Alignment {
         fragments: fragments,
         score: final_score,
+        stats,
     })
 }
 
@@ -646,11 +702,12 @@ fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
         data.swap_scores();
     }
 
-    let fragments = traceback(&data, max_col, max_row, false, true);
+    let (fragments, stats) = traceback(&data, &params, max_col, max_row, false, true);
 
     Ok(Alignment {
         fragments: fragments,
         score: max_score,
+        stats,
     })
 }
 
@@ -779,13 +836,15 @@ fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
         return Ok(Alignment {
             fragments: Vec::new(),
             score: 0,
+            stats: AlignmentStats::default(),
         });
     }
-    let fragments = traceback(&data, max_col as usize, max_row as usize, false, false);
+    let (fragments, stats) = traceback(&data, &params, max_col as usize, max_row as usize, false, false);
 
     Ok(Alignment {
         fragments: fragments,
         score: max_score,
+        stats,
     })
 }
 
