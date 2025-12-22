@@ -23,18 +23,7 @@ def test_stats_exact_match(common_data: AlignmentData) -> None:
     assert alignment.stats.length == 4
 
 
-def test_stats_mismatches(common_data: AlignmentData) -> None:
-    seqa = encode("AAAA", common_data.alphabet)
-    seqb = encode("ACGT", common_data.alphabet)
-
-    alignment = global_align(
-        seqa,
-        seqb,
-        common_data.score_matrix,
-        common_data.gap_open,
-        common_data.gap_extend,
-    )
-
+def test_stats_mismatches() -> None:
     alphabet = "ABC"
     score_matrix = np.array([[2, 1, -1], [1, 2, -1], [-1, -1, 2]], dtype=np.int32)
 
