@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2};
+use numpy::ndarray::{Array1, Array2};
 use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
