@@ -15,6 +15,7 @@ class AlignmentData:
     gap_open: int
     gap_extend: int
 
+
 @pytest.fixture
 def common_data() -> AlignmentData:
     alphabet = "ACGT"
@@ -34,6 +35,7 @@ def common_data() -> AlignmentData:
         gap_extend=gap_extend,
     )
 
+
 @pytest.fixture
 def complex_data() -> AlignmentData:
     alphabet = "ACGT"
@@ -51,6 +53,7 @@ def complex_data() -> AlignmentData:
         gap_open=gap_open,
         gap_extend=gap_extend,
     )
+
 
 @pytest.fixture
 def local_global_test_data() -> AlignmentData:
@@ -71,6 +74,7 @@ def local_global_test_data() -> AlignmentData:
         gap_extend=gap_extend,
     )
 
+
 @pytest.fixture
 def multi_fragment_data() -> AlignmentData:
     alphabet = "ACGT"
@@ -89,6 +93,7 @@ def multi_fragment_data() -> AlignmentData:
         gap_open=gap_open,
         gap_extend=gap_extend,
     )
+
 
 @pytest.fixture
 def poly_data() -> AlignmentData:
@@ -109,6 +114,7 @@ def poly_data() -> AlignmentData:
         gap_extend=gap_extend,
     )
 
+
 @pytest.fixture
 def poly_data_strong_gap_penalty() -> AlignmentData:
     alphabet = "ACGT"
@@ -128,6 +134,7 @@ def poly_data_strong_gap_penalty() -> AlignmentData:
         gap_extend=gap_extend,
     )
 
+
 @dataclasses.dataclass
 class AlignmentDataMany:
     alphabet: str
@@ -136,6 +143,7 @@ class AlignmentDataMany:
     score_matrix: np.ndarray
     gap_open: int
     gap_extend: int
+
 
 @pytest.fixture
 def threading_data() -> AlignmentDataMany:
