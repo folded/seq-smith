@@ -9,14 +9,6 @@ import numpy as np
 
 @final
 class Alignment:
-    r"""
-    Represents a complete sequence alignment.
-
-    Args:
-        fragments (list[AlignmentFragment]): A list of alignment fragments.
-        score (int): The total score of the alignment.
-        stats (AlignmentStats): Statistics about the alignment.
-    """
     @property
     def fragments(self) -> list[AlignmentFragment]: ...
     @property
@@ -26,15 +18,6 @@ class Alignment:
 
 @final
 class AlignmentFragment:
-    r"""
-    Represents a single fragment within a sequence alignment.
-
-    Args:
-        fragment_type (FragmentType): The type of the fragment (e.g., Match, AGap, BGap).
-        sa_start (int): The starting position in sequence A.
-        sb_start (int): The starting position in sequence B.
-        len (int): The length of the fragment.
-    """
     @property
     def fragment_type(self) -> FragmentType: ...
     @fragment_type.setter
@@ -48,9 +31,6 @@ class AlignmentFragment:
 
 @final
 class AlignmentStats:
-    r"""
-    Represents detailed statistics about an alignment.
-    """
     @property
     def num_exact_matches(self) -> int: ...
     @property
@@ -66,10 +46,6 @@ class AlignmentStats:
 
 @final
 class FragmentType(enum.Enum):
-    r"""
-    Represents the type of an alignment fragment.
-    """
-
     AGap = ...
     BGap = ...
     Match = ...
@@ -80,27 +56,7 @@ def global_align(
     score_matrix: np.typing.NDArray[np.int32],
     gap_open: int,
     gap_extend: int,
-) -> Alignment:
-    r"""
-    Performs a global alignment between two sequences using the Needleman-Wunsch algorithm.
-
-    Args:
-        seqa (bytes): The first sequence as a byte array.
-        seqb (bytes): The second sequence as a byte array.
-        score_matrix (np.ndarray): A 2D numpy array representing the scoring matrix.
-        gap_open (int): The penalty for opening a gap. Must be negative.
-        gap_extend (int): The penalty for extending a gap. Must be negative.
-
-    Raises:
-        ValueError: If any of the following are true:
-            * input sequences are empty
-            * gap penalties are not negative.
-            * score matrix is not 2-dimensional and square.
-
-    Returns:
-        Alignment: An Alignment object containing the score and alignment fragments.
-    """
-
+) -> Alignment: ...
 def global_align_many(
     seqa: bytes,
     seqbs: Sequence[bytes],
@@ -108,38 +64,14 @@ def global_align_many(
     gap_open: int,
     gap_extend: int,
     num_threads: int | None = None,
-) -> list[Alignment]:
-    r"""
-    Performs global alignment of one sequence against many sequences in parallel.
-    """
-
+) -> list[Alignment]: ...
 def local_align(
     seqa: bytes,
     seqb: bytes,
     score_matrix: np.typing.NDArray[np.int32],
     gap_open: int,
     gap_extend: int,
-) -> Alignment:
-    r"""
-    Performs a local alignment between two sequences using the Smith-Waterman algorithm.
-
-    Args:
-        seqa (bytes): The first sequence as a byte array.
-        seqb (bytes): The second sequence as a byte array.
-        score_matrix (np.ndarray): A 2D numpy array representing the scoring matrix.
-        gap_open (int): The penalty for opening a gap. Must be negative.
-        gap_extend (int): The penalty for extending a gap. Must be negative.
-
-    Raises:
-        ValueError: If any of the following are true:
-            * input sequences are empty
-            * gap penalties are not negative.
-            * score matrix is not 2-dimensional and square.
-
-    Returns:
-        Alignment: An Alignment object containing the score and alignment fragments.
-    """
-
+) -> Alignment: ...
 def local_align_many(
     seqa: bytes,
     seqbs: Sequence[bytes],
@@ -147,39 +79,14 @@ def local_align_many(
     gap_open: int,
     gap_extend: int,
     num_threads: int | None = None,
-) -> list[Alignment]:
-    r"""
-    Performs local alignment of one sequence against many sequences in parallel.
-    """
-
+) -> list[Alignment]: ...
 def local_global_align(
     seqa: bytes,
     seqb: bytes,
     score_matrix: npt.NDArray[np.int32],
     gap_open: int,
     gap_extend: int,
-) -> Alignment:
-    r"""
-    Performs a local-global alignment. This alignment finds the best local alignment of `seqa`
-    within `seqb`, but `seqb` must be aligned globally.
-
-    Args:
-        seqa (bytes): The first sequence as a byte array.
-        seqb (bytes): The second sequence as a byte array.
-        score_matrix (np.ndarray): A 2D numpy array representing the scoring matrix.
-        gap_open (int): The penalty for opening a gap. Must be negative.
-        gap_extend (int): The penalty for extending a gap. Must be negative.
-
-    Raises:
-        ValueError: If any of the following are true:
-            * input sequences are empty
-            * gap penalties are not negative.
-            * score matrix is not 2-dimensional and square.
-
-    Returns:
-        Alignment: An Alignment object containing the score and alignment fragments.
-    """
-
+) -> Alignment: ...
 def local_global_align_many(
     seqa: bytes,
     seqbs: Sequence[bytes],
@@ -187,41 +94,14 @@ def local_global_align_many(
     gap_open: int,
     gap_extend: int,
     num_threads: int | None = None,
-) -> list[Alignment]:
-    r"""
-    Performs local-global alignment of one sequence against many sequences in parallel.
-    """
-
+) -> list[Alignment]: ...
 def overlap_align(
     seqa: bytes,
     seqb: bytes,
     score_matrix: npt.NDArray[np.int32],
     gap_open: int,
     gap_extend: int,
-) -> Alignment:
-    r"""
-    Performs an overlap alignment between two sequences.
-
-    This alignment type does not penalize gaps at the start or end of either sequence,
-    making it suitable for finding overlaps between sequences.
-
-    Args:
-        seqa (bytes): The first sequence as a byte array.
-        seqb (bytes): The second sequence as a byte array.
-        score_matrix (np.ndarray): A 2D numpy array representing the scoring matrix.
-        gap_open (int): The penalty for opening a gap. Must be negative.
-        gap_extend (int): The penalty for extending a gap. Must be negative.
-
-    Raises:
-        ValueError: If any of the following are true:
-            * input sequences are empty
-            * gap penalties are not negative.
-            * score matrix is not 2-dimensional and square.
-
-    Returns:
-        Alignment: An Alignment object containing the score and alignment fragments.
-    """
-
+) -> Alignment: ...
 def overlap_align_many(
     seqa: bytes,
     seqbs: Sequence[bytes],
@@ -229,7 +109,4 @@ def overlap_align_many(
     gap_open: int,
     gap_extend: int,
     num_threads: int | None = None,
-) -> list[Alignment]:
-    r"""
-    Performs overlap alignment of one sequence against many sequences in parallel.
-    """
+) -> list[Alignment]: ...
