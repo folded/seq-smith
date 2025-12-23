@@ -19,7 +19,7 @@ def make_score_matrix(
         match_score (int): The score for a match.
         mismatch_score (int): The score for a mismatch.
         ambiguous (str): Characters that represent an ambiguous match.
-        ambiguous_match_score (int): The score for a ambiguous match.
+        ambiguous_match_score (int): The score for an ambiguous match.
 
     Returns:
         numpy.ndarray: A 2D numpy array representing the scoring matrix.
