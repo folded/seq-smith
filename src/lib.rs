@@ -84,7 +84,7 @@ struct AlignmentStats {
 #[pymethods]
 impl AlignmentStats {
     #[getter]
-    fn length(&self) -> i32 {
+    fn len(&self) -> i32 {
         self.num_exact_matches
             + self.num_positive_mismatches
             + self.num_negative_mismatches

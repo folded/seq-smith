@@ -73,14 +73,7 @@ known-first-party = ["src"]
 "docs/*" = [
     "A001"
 ]
-"*.pyi" = [
-    "I001",
-    "ICN001",
-    "PYI021",
-    "RUF100",
-    "UP045",
-    "W293",
-]
+
 
 [tool.mypy]
 python_version = "3.11"

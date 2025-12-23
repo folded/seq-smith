@@ -20,7 +20,7 @@ def test_stats_exact_match(common_data: AlignmentData) -> None:
     assert alignment.stats.num_negative_mismatches == 0
     assert alignment.stats.num_a_gaps == 0
     assert alignment.stats.num_b_gaps == 0
-    assert alignment.stats.length == 4
+    assert alignment.stats.len == 4
 
 
 def test_stats_mismatches() -> None:
@@ -37,7 +37,7 @@ def test_stats_mismatches() -> None:
     assert alignment.stats.num_negative_mismatches == 1  # A-C
     assert alignment.stats.num_a_gaps == 0
     assert alignment.stats.num_b_gaps == 0
-    assert alignment.stats.length == 3
+    assert alignment.stats.len == 3
 
 
 def test_stats_gaps(common_data: AlignmentData) -> None:
@@ -56,7 +56,7 @@ def test_stats_gaps(common_data: AlignmentData) -> None:
     assert alignment.stats.num_exact_matches == 1
     assert alignment.stats.num_a_gaps == 2
     assert alignment.stats.num_b_gaps == 0
-    assert alignment.stats.length == 3
+    assert alignment.stats.len == 3
 
 
 def test_stats_gap_b(common_data: AlignmentData) -> None:
@@ -74,4 +74,4 @@ def test_stats_gap_b(common_data: AlignmentData) -> None:
     assert alignment.stats.num_exact_matches == 1
     assert alignment.stats.num_b_gaps == 2
     assert alignment.stats.num_a_gaps == 0
-    assert alignment.stats.length == 3
+    assert alignment.stats.len == 3
