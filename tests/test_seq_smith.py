@@ -3,6 +3,7 @@ import pytest
 from conftest import AlignmentData
 
 from seq_smith import (
+    FragmentType,
     encode,
     format_alignment_ascii,
     generate_cigar,
@@ -454,3 +455,31 @@ def test_generate_cigar_with_deletion(common_data: AlignmentData) -> None:
     alignment = global_align(seqa, seqb, common_data.score_matrix, common_data.gap_open, common_data.gap_extend)
     cigar = generate_cigar(alignment)
     assert cigar == "1M1D"  # AC vs A-, so A matches, then C is a deletion in seqB (query)
+
+
+def test_local_global_align_overhangs() -> None:
+    # Case 1: Sequence B (Global) has overhanging tails
+    # A:      CCCC
+    # B: AAACCCCAAA
+    # Expected: A aligns to central C's, B has leading/trailing gaps.
+    seqa = encode("CCCC", "ACGT")
+    seqb = encode("AAACCCCAAA", "ACGT")
+    sm = make_score_matrix("ACGT", match_score=2, mismatch_score=-2)
+    aln = local_global_align(seqa, seqb, sm, gap_open=-3, gap_extend=-1)
+
+    # Check the fragments
+    # Expected:
+    # 1. GapA len 3 (AAA)
+    # 2. Match len 4 (CCCC)
+    # 3. GapA len 3 (AAA)
+
+    frags = aln.fragments
+    assert len(frags) == 3
+    assert frags[0].fragment_type == FragmentType.AGap
+    assert frags[0].len == 3
+    assert frags[1].fragment_type == FragmentType.Match
+    assert frags[1].len == 4
+    assert frags[2].fragment_type == FragmentType.AGap
+    assert frags[2].len == 3
+
+    assert aln.score == -2

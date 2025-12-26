@@ -676,9 +676,10 @@ fn _local_global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     let mut max_col = 0;
 
     for row in 0..params.sb_len {
-        data.prev_score[row] = std::i32::MIN;
+        let score = params.gap_cost(row as i32 + 1);
+        data.prev_score[row] = score;
         data.hgap_pos[row] = -1;
-        data.hgap_score[row] = std::i32::MIN;
+        data.hgap_score[row] = score.saturating_add(params.gap_open);
     }
 
     for col in 0..params.sa_len {
