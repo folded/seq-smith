@@ -458,7 +458,7 @@ def test_generate_cigar_with_deletion(common_data: AlignmentData) -> None:
 
 
 def test_local_global_align_overhangs() -> None:
-    # Case 1: Sequence B (Global) has overhanging tails
+    # Sequence B (Global) has overhanging tails
     # sequence A: CCCC
     # sequence B: AAACCCCAAA
     # Expected: A aligns to central C's, B has leading/trailing gaps.
