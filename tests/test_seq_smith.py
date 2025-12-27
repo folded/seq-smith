@@ -508,8 +508,8 @@ def test_top_k_ungapped_simple() -> None:
 
 def test_top_k_ungapped_overlapping_candidates(common_data: AlignmentData) -> None:
     # Case where second best candidate overlaps best
-    # A: AAAAA
-    # B: AAAAA
+    # Sequence A: AAAAA
+    # Sequence B: AAAAA
     # match=1 (from common_data observation)
 
     seqa = encode("AAAAA", common_data.alphabet)
@@ -535,7 +535,7 @@ def test_top_k_ungapped_limit() -> None:
 
     score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
 
-    # AA (4), mismatch, CC (4), mismatch, GG (4)
+    # Expected HSPs: AA (4), mismatch, CC (4), mismatch, GG (4)
 
     alignments = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=2)
 
@@ -545,9 +545,9 @@ def test_top_k_ungapped_limit() -> None:
 
 
 def test_top_k_ungapped_many_simple() -> None:
-    # A: AAAA
-    # B1: AAAA (perfect)
-    # B2: CCCC (mismatch)
+    # Sequence A: AAAA
+    # Sequence B1: AAAA (perfect)
+    # Sequence B2: CCCC (mismatch)
     alphabet = "ACGT"
     seqa = encode("AAAA", alphabet)
 

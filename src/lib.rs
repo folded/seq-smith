@@ -1008,11 +1008,13 @@ struct Candidate {
     len: usize,
 }
 
+impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
         self.score.cmp(&other.score)
             .then_with(|| self.sa_start.cmp(&other.sa_start))
             .then_with(|| self.sb_start.cmp(&other.sb_start))
     }
+}
 
 impl PartialOrd for Candidate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -1035,26 +1037,26 @@ fn _top_k_ungapped_local_align_core(
         let mut segment_start_idx = 0; // index along diagonal where current positive segment started
         let mut peak_score = 0;
         let mut peak_idx = 0; // index along diagonal where peak occurred
-        
+
         // Iterate along diagonal
         let max_len = std::cmp::min(sa_len - start_col, sb_len);
         for i in 0..max_len {
             let row = i;
             let col = start_col + i;
             let val = params.match_score(row, col);
-            
+
             if curr_score == 0 && val <= 0 {
                 // Still finding start
                 continue;
             }
-            
+
             if curr_score == 0 {
                 // Rising from 0
                 segment_start_idx = i;
             }
-            
+
             curr_score += val;
-            
+
             if curr_score <= 0 {
                 // End of potential segment
                 if peak_score > 0 {
@@ -1091,18 +1093,18 @@ fn _top_k_ungapped_local_align_core(
         let mut segment_start_idx = 0;
         let mut peak_score = 0;
         let mut peak_idx = 0;
-        
+
         let max_len = std::cmp::min(sa_len, sb_len - start_row);
         for i in 0..max_len {
             let row = start_row + i;
             let col = i;
             let val = params.match_score(row, col);
-             
+
             if curr_score == 0 && val <= 0 { continue; }
             if curr_score == 0 { segment_start_idx = i; }
-            
+
             curr_score += val;
-            
+
             if curr_score <= 0 {
                if peak_score > 0 {
                     candidates.push(Candidate {
@@ -1130,16 +1132,16 @@ fn _top_k_ungapped_local_align_core(
             });
         }
     }
-    
+
     // Select top k non-overlapping
     let mut alignments: Vec<Alignment> = Vec::with_capacity(k);
-    
+
     while alignments.len() < k {
         if let Some(candidate) = candidates.pop() {
              // Check overlap
              let sa_end = candidate.sa_start + candidate.len;
              let sb_end = candidate.sb_start + candidate.len;
-             
+
              let mut overlap = false;
              for prev in &alignments {
                  let prev_frag = &prev.fragments[0]; // Ungapped has 1 fragment
@@ -1147,7 +1149,7 @@ fn _top_k_ungapped_local_align_core(
                  let p_sa_end = p_sa_start + prev_frag.len as usize;
                  let p_sb_start = prev_frag.sb_start as usize - 1;
                  let p_sb_end = p_sb_start + prev_frag.len as usize;
-                 
+
                  // Overlap in A?
                  if candidate.sa_start < p_sa_end && sa_end > p_sa_start {
                      overlap = true;
@@ -1159,7 +1161,7 @@ fn _top_k_ungapped_local_align_core(
                      break;
                  }
              }
-             
+
              if !overlap {
                 // Construct Alignment
                 let mut stats = AlignmentStats::default();
@@ -1175,14 +1177,14 @@ fn _top_k_ungapped_local_align_core(
                          stats.num_negative_mismatches += 1;
                      }
                 }
-                
+
                 let frag = AlignmentFragment {
                     fragment_type: FragmentType::Match,
                     sa_start: (candidate.sa_start + 1) as i32,
                     sb_start: (candidate.sb_start + 1) as i32,
                     len: candidate.len as i32
                 };
-                
+
                 alignments.push(Alignment {
                     fragments: vec![frag],
                     score: candidate.score,
@@ -1193,7 +1195,7 @@ fn _top_k_ungapped_local_align_core(
             break;
         }
     }
-    
+
     Ok(alignments)
 }
 
@@ -1263,7 +1265,7 @@ fn top_k_ungapped_local_align_many<'py>(
             .num_threads(num_threads.unwrap_or(0))
             .build()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create thread pool: {}", e)))?;
-            
+
         pool.install(|| {
             seqbs
                 .into_par_iter()
