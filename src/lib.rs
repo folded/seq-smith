@@ -187,11 +187,7 @@ struct UngappedAlignmentParams<'a> {
 }
 
 impl<'a> UngappedAlignmentParams<'a> {
-    fn new(
-        seqa: &'a Vec<u8>,
-        seqb: &'a Vec<u8>,
-        score_matrix: &'a Array2<i32>,
-    ) -> PyResult<Self> {
+    fn new(seqa: &'a Vec<u8>, seqb: &'a Vec<u8>, score_matrix: &'a Array2<i32>) -> PyResult<Self> {
         if seqa.is_empty() || seqb.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Input sequences cannot be empty.",
@@ -416,7 +412,7 @@ fn traceback(
                     if residue_a == residue_b {
                         stats.num_exact_matches += 1;
                     } else {
-                        let score = params.score_matrix[[residue_a as usize, residue_b as usize]];
+                        let score = params.match_score(residue_a as usize, residue_b as usize);
                         if score > 0 {
                             stats.num_positive_mismatches += 1;
                         } else {
@@ -551,13 +547,7 @@ fn local_align<'py>(
     let score_matrix = score_matrix.as_array().into_owned();
 
     py.detach(move || {
-        let params = AlignmentParams::new(
-            &seqa,
-            &seqb,
-            &score_matrix,
-            gap_open,
-            gap_extend,
-        )?;
+        let params = AlignmentParams::new(&seqa, &seqb, &score_matrix, gap_open, gap_extend)?;
         _local_align_core(params)
     })
 }
@@ -624,8 +614,14 @@ fn _global_align_core(params: AlignmentParams) -> PyResult<Alignment> {
     }
 
     let final_score = data.prev_score[params.sb.len() - 1];
-    let (fragments, stats) =
-        traceback(&data, &params, params.sa.len() - 1, params.sb.len() - 1, true, true);
+    let (fragments, stats) = traceback(
+        &data,
+        &params,
+        params.sa.len() - 1,
+        params.sb.len() - 1,
+        true,
+        true,
+    );
 
     Ok(Alignment {
         fragments: fragments,
@@ -666,13 +662,7 @@ fn global_align<'py>(
     let score_matrix = score_matrix.as_array().into_owned();
 
     py.detach(move || {
-        let params = AlignmentParams::new(
-            &seqa,
-            &seqb,
-            &score_matrix,
-            gap_open,
-            gap_extend,
-        )?;
+        let params = AlignmentParams::new(&seqa, &seqb, &score_matrix, gap_open, gap_extend)?;
         _global_align_core(params)
     })
 }
@@ -784,13 +774,7 @@ fn local_global_align<'py>(
     let score_matrix = score_matrix.as_array().into_owned();
 
     py.detach(move || {
-        let params = AlignmentParams::new(
-            &seqa,
-            &seqb,
-            &score_matrix,
-            gap_open,
-            gap_extend,
-        )?;
+        let params = AlignmentParams::new(&seqa, &seqb, &score_matrix, gap_open, gap_extend)?;
         _local_global_align_core(params)
     })
 }
@@ -865,7 +849,11 @@ fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
             data.write_cell(row, col, score, dir);
             data.update_gaps(row, col, score, &params);
         }
-        update_max_score(data.curr_score[params.sb.len() - 1], params.sb.len() - 1, col);
+        update_max_score(
+            data.curr_score[params.sb.len() - 1],
+            params.sb.len() - 1,
+            col,
+        );
         data.swap_scores();
     }
     for row in 0..params.sb.len() {
@@ -879,7 +867,14 @@ fn _overlap_align_core(params: AlignmentParams) -> PyResult<Alignment> {
             stats: AlignmentStats::default(),
         });
     }
-    let (fragments, stats) = traceback(&data, &params, max_col as usize, max_row as usize, false, false);
+    let (fragments, stats) = traceback(
+        &data,
+        &params,
+        max_col as usize,
+        max_row as usize,
+        false,
+        false,
+    );
 
     Ok(Alignment {
         fragments: fragments,
@@ -923,13 +918,7 @@ fn overlap_align<'py>(
     let score_matrix = score_matrix.as_array().into_owned();
 
     py.detach(move || {
-        let params = AlignmentParams::new(
-            &seqa,
-            &seqb,
-            &score_matrix,
-            gap_open,
-            gap_extend,
-        )?;
+        let params = AlignmentParams::new(&seqa, &seqb, &score_matrix, gap_open, gap_extend)?;
         _overlap_align_core(params)
     })
 }
@@ -979,26 +968,24 @@ where
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads.unwrap_or(0)) // 0 tells rayon to use a default number of threads
         .build()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create thread pool: {}", e)))?;
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to create thread pool: {}",
+                e
+            ))
+        })?;
 
     pool.install(|| {
         seqbs
             .into_par_iter()
             .map(|seqb| {
-                let params = AlignmentParams::new(
-                    &seqa,
-                    &seqb,
-                    &score_matrix,
-                    gap_open,
-                    gap_extend,
-                )?;
+                let params =
+                    AlignmentParams::new(&seqa, &seqb, &score_matrix, gap_open, gap_extend)?;
                 align_func(params)
             })
             .collect()
     })
 }
-
-
 
 #[derive(Eq, PartialEq)]
 struct Candidate {
@@ -1010,7 +997,8 @@ struct Candidate {
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.score.cmp(&other.score)
+        self.score
+            .cmp(&other.score)
             .then_with(|| self.sa_start.cmp(&other.sa_start))
             .then_with(|| self.sb_start.cmp(&other.sb_start))
     }
@@ -1033,6 +1021,17 @@ fn _top_k_ungapped_local_align_core(
 
     let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
 
+    let mut add_candidate = |score: i32, sa_start: usize, sb_start: usize, len: usize| {
+        if score > 0 {
+            candidates.push(Candidate {
+                score,
+                sa_start,
+                sb_start,
+                len,
+            });
+        }
+    };
+
     let mut process_diagonal = |start_row: usize, start_col: usize, max_len: usize| {
         let mut curr_score = 0;
         let mut segment_start_idx = 0; // index along diagonal where current positive segment started
@@ -1044,20 +1043,22 @@ fn _top_k_ungapped_local_align_core(
             let col = start_col + i;
             let val = params.match_score(row, col);
 
-            if curr_score == 0 && val <= 0 { continue; }
-            if curr_score == 0 { segment_start_idx = i; }
+            if curr_score == 0 && val <= 0 {
+                continue;
+            }
+            if curr_score == 0 {
+                segment_start_idx = i;
+            }
 
             curr_score += val;
 
             if curr_score <= 0 {
-                if peak_score > 0 {
-                     candidates.push(Candidate {
-                        score: peak_score,
-                        sa_start: start_col + segment_start_idx,
-                        sb_start: start_row + segment_start_idx,
-                        len: peak_idx - segment_start_idx + 1
-                    });
-                }
+                add_candidate(
+                    peak_score,
+                    start_col + segment_start_idx,
+                    start_row + segment_start_idx,
+                    peak_idx - segment_start_idx + 1,
+                );
                 curr_score = 0;
                 peak_score = 0;
             } else {
@@ -1067,14 +1068,12 @@ fn _top_k_ungapped_local_align_core(
                 }
             }
         }
-        if peak_score > 0 {
-            candidates.push(Candidate {
-                score: peak_score,
-                sa_start: start_col + segment_start_idx,
-                sb_start: start_row + segment_start_idx,
-                len: peak_idx - segment_start_idx + 1
-            });
-        }
+        add_candidate(
+            peak_score,
+            start_col + segment_start_idx,
+            start_row + segment_start_idx,
+            peak_idx - segment_start_idx + 1,
+        );
     };
 
     // Diagonals starting at first row (row=0, col=0..sa_len)
@@ -1094,58 +1093,55 @@ fn _top_k_ungapped_local_align_core(
 
     while alignments.len() < k {
         if let Some(candidate) = candidates.pop() {
-             // Check overlap
-             let sa_end = candidate.sa_start + candidate.len;
-             let sb_end = candidate.sb_start + candidate.len;
+            // Check overlap
+            let sa_end = candidate.sa_start + candidate.len;
+            let sb_end = candidate.sb_start + candidate.len;
 
-             let mut overlap = false;
-             for prev in &alignments {
-                 let p_sa_start = (prev.fragments[0].sa_start - 1) as usize; // 0-indexed
-                 let p_sb_start = (prev.fragments[0].sb_start - 1) as usize; // 0-indexed
-                 let p_sa_end = p_sa_start + prev.fragments[0].len as usize;
-                 let p_sb_end = p_sb_start + prev.fragments[0].len as usize;
+            let overlap = alignments.iter().any(|prev| {
+                let p_sa_start = (prev.fragments[0].sa_start - 1) as usize; // 0-indexed
+                let p_sb_start = (prev.fragments[0].sb_start - 1) as usize; // 0-indexed
+                let p_sa_end = p_sa_start + prev.fragments[0].len as usize;
+                let p_sb_end = p_sb_start + prev.fragments[0].len as usize;
 
-                 // Overlap in A?
-                 if filter_overlap_a && candidate.sa_start < p_sa_end && sa_end > p_sa_start {
-                     overlap = true;
-                     break;
-                 }
-                 // Overlap in B?
-                 if filter_overlap_b && candidate.sb_start < p_sb_end && sb_end > p_sb_start {
-                     overlap = true;
-                     break;
-                 }
-             }
+                // Overlap in A?
+                let overlaps_a =
+                    filter_overlap_a && candidate.sa_start < p_sa_end && sa_end > p_sa_start;
+                // Overlap in B?
+                let overlaps_b =
+                    filter_overlap_b && candidate.sb_start < p_sb_end && sb_end > p_sb_start;
 
-             if !overlap {
+                overlaps_a || overlaps_b
+            });
+
+            if !overlap {
                 // Construct Alignment
                 let mut stats = AlignmentStats::default();
                 for i in 0..candidate.len {
-                     let r = candidate.sb_start + i;
-                     let c = candidate.sa_start + i;
-                     let val = params.score_matrix[[params.sa[c] as usize, params.sb[r] as usize]];
-                     if params.sa[c] == params.sb[r] {
-                         stats.num_exact_matches += 1;
-                     } else if val > 0 {
-                         stats.num_positive_mismatches += 1;
-                     } else {
-                         stats.num_negative_mismatches += 1;
-                     }
+                    let r = candidate.sb_start + i;
+                    let c = candidate.sa_start + i;
+                    let val = params.match_score(c, r);
+                    if params.sa[c] == params.sb[r] {
+                        stats.num_exact_matches += 1;
+                    } else if val > 0 {
+                        stats.num_positive_mismatches += 1;
+                    } else {
+                        stats.num_negative_mismatches += 1;
+                    }
                 }
 
                 let frag = AlignmentFragment {
                     fragment_type: FragmentType::Match,
                     sa_start: (candidate.sa_start + 1) as i32,
                     sb_start: (candidate.sb_start + 1) as i32,
-                    len: candidate.len as i32
+                    len: candidate.len as i32,
                 };
 
                 alignments.push(Alignment {
                     fragments: vec![frag],
                     score: candidate.score,
-                    stats: stats
+                    stats: stats,
                 });
-             }
+            }
         } else {
             break;
         }
@@ -1182,11 +1178,7 @@ fn top_k_ungapped_local_align<'py>(
 
     py.detach(move || {
         _top_k_ungapped_local_align_core(
-            UngappedAlignmentParams::new(
-                &seqa,
-                &seqb,
-                &score_matrix,
-            )?,
+            UngappedAlignmentParams::new(&seqa, &seqb, &score_matrix)?,
             k,
             filter_overlap_a,
             filter_overlap_b,
@@ -1226,18 +1218,19 @@ fn top_k_ungapped_local_align_many<'py>(
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads.unwrap_or(0))
             .build()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create thread pool: {}", e)))?;
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to create thread pool: {}",
+                    e
+                ))
+            })?;
 
         pool.install(|| {
             seqbs
                 .into_par_iter()
                 .map(|seqb| {
                     _top_k_ungapped_local_align_core(
-                        UngappedAlignmentParams::new(
-                            &seqa,
-                            &seqb,
-                            &score_matrix,
-                        )?,
+                        UngappedAlignmentParams::new(&seqa, &seqb, &score_matrix)?,
                         k,
                         filter_overlap_a,
                         filter_overlap_b,
