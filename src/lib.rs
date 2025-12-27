@@ -1269,11 +1269,11 @@ fn top_k_ungapped_local_align_many<'py>(
                 .into_par_iter()
                 .map(|seqb| {
                     _top_k_ungapped_local_align_core(
-                        UngappedAlignmentParams {
-                            sa: &seqa,
-                            sb: &seqb,
-                            score_matrix: &score_matrix,
-                        },
+                        UngappedAlignmentParams::new(
+                            &seqa,
+                            &seqb,
+                            &score_matrix,
+                        )?,
                         k,
                     )
                 })
