@@ -10,6 +10,8 @@ from ._seq_smith import (
     local_global_align_many,
     overlap_align,
     overlap_align_many,
+    top_k_ungapped_local_align,
+    top_k_ungapped_local_align_many,
 )
 from .python_utils import decode, encode, format_alignment_ascii, generate_cigar, make_score_matrix
 
@@ -30,4 +32,6 @@ __all__ = [
     "make_score_matrix",
     "overlap_align",
     "overlap_align_many",
+    "top_k_ungapped_local_align",
+    "top_k_ungapped_local_align_many",
 ]
