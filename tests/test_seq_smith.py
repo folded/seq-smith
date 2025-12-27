@@ -541,7 +541,6 @@ def test_top_k_ungapped_limit() -> None:
 
     assert len(alignments) == 2
     assert alignments[0].score == 4
-    assert alignments[0].score == 4
     assert alignments[1].score == 4
 
 
