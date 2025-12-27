@@ -13,6 +13,8 @@ from seq_smith import (
     local_global_align,
     make_score_matrix,
     overlap_align,
+    top_k_ungapped_local_align,
+    top_k_ungapped_local_align_many,
 )
 
 
@@ -476,3 +478,96 @@ def test_local_global_align_overhangs() -> None:
     assert aln.fragments == expected_fragments
 
     assert aln.score == -2
+
+
+def test_top_k_ungapped_simple() -> None:
+    # Use custom alphabet to support Z/W if needed, or just use ACGT
+    alphabet = "ACGT"
+    seqa = encode("AAAATTTTCCCC", alphabet)
+    seqb = encode("AAAAGGGGCCCC", alphabet)
+
+    # matrix: match=2, mismatch=-5
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    # AAAA matches (4*2=8). TTTT vs GGGG (-5*4 = -20). CCCC matches (8).
+    # Alignment 1: AAAA (score 8)
+    # Alignment 2: CCCC (score 8)
+
+    alignments = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=5)
+
+    # Should get 2 alignments
+    assert len(alignments) == 2
+    # Verify scores
+    assert alignments[0].score == 8
+    assert alignments[1].score == 8
+
+    starts = sorted([(a.fragments[0].sa_start, a.fragments[0].sb_start) for a in alignments])
+    assert starts[0] == (1, 1)  # 1-based index in fragments
+    assert starts[1] == (9, 9)
+
+
+def test_top_k_ungapped_overlapping_candidates(common_data: AlignmentData) -> None:
+    # Case where second best candidate overlaps best
+    # Sequence A: AAAAA
+    # Sequence B: AAAAA
+    # match=1 (from common_data observation)
+
+    seqa = encode("AAAAA", common_data.alphabet)
+    seqb = encode("AAAAA", common_data.alphabet)
+
+    # ensure score matrix is what we think (match=1) or make our own
+    score_matrix = make_score_matrix(common_data.alphabet, match_score=2, mismatch_score=-1)
+
+    alignments = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=2)
+
+    assert len(alignments) == 1
+    assert alignments[0].score == 10  # 5 * 2
+    assert alignments[0].fragments[0].len == 5
+
+
+def test_top_k_ungapped_limit() -> None:
+    # A: AA..CC..GG
+    # B: AA..CC..GG
+    alphabet = "ACGT"
+    # Use T vs G for mismatch
+    seqa = encode("AATTCCTTGG", alphabet)
+    seqb = encode("AAGGCCGGGG", alphabet)
+
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    # Expected HSPs: AA (4), mismatch, CC (4), mismatch, GG (4)
+
+    alignments = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=2)
+
+    assert len(alignments) == 2
+    assert alignments[0].score == 4
+    assert alignments[1].score == 4
+
+
+def test_top_k_ungapped_many_simple() -> None:
+    # Sequence A: AAAA
+    # Sequence B1: AAAA (perfect)
+    # Sequence B2: CCCC (mismatch)
+    alphabet = "ACGT"
+    seqa = encode("AAAA", alphabet)
+
+    seqb1 = encode("AAAA", alphabet)
+    seqb2 = encode("CCCC", alphabet)
+
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    alignments_list = top_k_ungapped_local_align_many(seqa, [seqb1, seqb2], score_matrix, k=1)
+
+    assert len(alignments_list) == 2
+
+    # Check first alignment (AAAA vs AAAA)
+    # Should have score 8
+    assert len(alignments_list[0]) == 1
+    assert alignments_list[0][0].score == 8
+
+    # Check second alignment (AAAA vs CCCC)
+    # Should have no positive candidates if mismatch penalty is high enough?
+    # -5 * 4 = -20.
+    # So should be empty if score <= 0.
+    # Our implementation returns empty if no positive peaks.
+    assert len(alignments_list[1]) == 0

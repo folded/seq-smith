@@ -117,3 +117,20 @@ def overlap_align_many(
     gap_extend: int,
     num_threads: int | None = None,
 ) -> list[Alignment]: ...
+def top_k_ungapped_local_align(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: npt.NDArray[np.int32],
+    k: int,
+    filter_overlap_a: bool = True,
+    filter_overlap_b: bool = True,
+) -> list[Alignment]: ...
+def top_k_ungapped_local_align_many(
+    seqa: bytes,
+    seqbs: Sequence[bytes],
+    score_matrix: npt.NDArray[np.int32],
+    k: int,
+    num_threads: int | None = None,
+    filter_overlap_a: bool = True,
+    filter_overlap_b: bool = True,
+) -> list[list[Alignment]]: ...
