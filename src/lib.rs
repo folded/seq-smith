@@ -1031,73 +1031,15 @@ fn _top_k_ungapped_local_align_core(
 
     let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
 
-    // Diagonals starting at first row (row=0, col=0..sa_len)
-    for start_col in 0..sa_len {
+    let mut process_diagonal = |start_row: usize, start_col: usize, max_len: usize| {
         let mut curr_score = 0;
         let mut segment_start_idx = 0; // index along diagonal where current positive segment started
         let mut peak_score = 0;
         let mut peak_idx = 0; // index along diagonal where peak occurred
 
-        // Iterate along diagonal
-        let max_len = std::cmp::min(sa_len - start_col, sb_len);
-        for i in 0..max_len {
-            let row = i;
-            let col = start_col + i;
-            let val = params.match_score(row, col);
-
-            if curr_score == 0 && val <= 0 {
-                // Still finding start
-                continue;
-            }
-
-            if curr_score == 0 {
-                // Rising from 0
-                segment_start_idx = i;
-            }
-
-            curr_score += val;
-
-            if curr_score <= 0 {
-                // End of potential segment
-                if peak_score > 0 {
-                     candidates.push(Candidate {
-                        score: peak_score,
-                        sa_start: start_col + segment_start_idx,
-                        sb_start: segment_start_idx,
-                        len: peak_idx - segment_start_idx + 1
-                    });
-                }
-                curr_score = 0;
-                peak_score = 0;
-            } else {
-                if curr_score > peak_score {
-                    peak_score = curr_score;
-                    peak_idx = i;
-                }
-            }
-        }
-        // End of diagonal check
-        if peak_score > 0 {
-            candidates.push(Candidate {
-                score: peak_score,
-                sa_start: start_col + segment_start_idx,
-                sb_start: segment_start_idx, // row start
-                len: peak_idx - segment_start_idx + 1
-            });
-        }
-    }
-
-    // Diagonals starting at first column (row=1..sb_len, col=0)
-    for start_row in 1..sb_len {
-        let mut curr_score = 0;
-        let mut segment_start_idx = 0;
-        let mut peak_score = 0;
-        let mut peak_idx = 0;
-
-        let max_len = std::cmp::min(sa_len, sb_len - start_row);
         for i in 0..max_len {
             let row = start_row + i;
-            let col = i;
+            let col = start_col + i;
             let val = params.match_score(row, col);
 
             if curr_score == 0 && val <= 0 { continue; }
@@ -1106,10 +1048,10 @@ fn _top_k_ungapped_local_align_core(
             curr_score += val;
 
             if curr_score <= 0 {
-               if peak_score > 0 {
-                    candidates.push(Candidate {
+                if peak_score > 0 {
+                     candidates.push(Candidate {
                         score: peak_score,
-                        sa_start: segment_start_idx, // col start
+                        sa_start: start_col + segment_start_idx,
                         sb_start: start_row + segment_start_idx,
                         len: peak_idx - segment_start_idx + 1
                     });
@@ -1126,11 +1068,23 @@ fn _top_k_ungapped_local_align_core(
         if peak_score > 0 {
             candidates.push(Candidate {
                 score: peak_score,
-                sa_start: segment_start_idx,
+                sa_start: start_col + segment_start_idx,
                 sb_start: start_row + segment_start_idx,
                 len: peak_idx - segment_start_idx + 1
             });
         }
+    };
+
+    // Diagonals starting at first row (row=0, col=0..sa_len)
+    for start_col in 0..sa_len {
+        let max_len = std::cmp::min(sa_len - start_col, sb_len);
+        process_diagonal(0, start_col, max_len);
+    }
+
+    // Diagonals starting at first column (row=1..sb_len, col=0)
+    for start_row in 1..sb_len {
+        let max_len = std::cmp::min(sa_len, sb_len - start_row);
+        process_diagonal(start_row, 0, max_len);
     }
 
     // Select top k non-overlapping
