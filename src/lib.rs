@@ -1008,11 +1008,11 @@ struct Candidate {
     len: usize,
 }
 
-impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
         self.score.cmp(&other.score)
+            .then_with(|| self.sa_start.cmp(&other.sa_start))
+            .then_with(|| self.sb_start.cmp(&other.sb_start))
     }
-}
 
 impl PartialOrd for Candidate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
