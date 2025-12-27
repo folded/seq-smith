@@ -18,6 +18,13 @@ class Alignment:
 
 @final
 class AlignmentFragment:
+    def __init__(
+        self,
+        fragment_type: FragmentType,
+        sa_start: int,
+        sb_start: int,
+        length: int,
+    ) -> None: ...
     @property
     def fragment_type(self) -> FragmentType: ...
     @fragment_type.setter

@@ -469,9 +469,9 @@ def test_local_global_align_overhangs() -> None:
     aln = local_global_align(seqa, seqb, sm, gap_open=-3, gap_extend=-1)
 
     expected_fragments = [
-        AlignmentFragment(fragment_type=FragmentType.AGap, sa_start=0, sb_start=0, len=3),
-        AlignmentFragment(fragment_type=FragmentType.Match, sa_start=0, sb_start=3, len=4),
-        AlignmentFragment(fragment_type=FragmentType.AGap, sa_start=4, sb_start=7, len=3),
+        AlignmentFragment(FragmentType.AGap, 0, 0, 3),
+        AlignmentFragment(FragmentType.Match, 0, 3, 4),
+        AlignmentFragment(FragmentType.AGap, 4, 7, 3),
     ]
     assert aln.fragments == expected_fragments
 
