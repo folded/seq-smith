@@ -468,19 +468,11 @@ def test_local_global_align_overhangs() -> None:
     sm = make_score_matrix("ACGT", match_score=2, mismatch_score=-2)
     aln = local_global_align(seqa, seqb, sm, gap_open=-3, gap_extend=-1)
 
-    # Check the fragments
-    # Expected:
-    # 1. GapA len 3 (AAA)
-    # 2. Match len 4 (CCCC)
-    # 3. GapA len 3 (AAA)
-
-    frags = aln.fragments
-    assert len(frags) == 3
-    assert frags[0].fragment_type == FragmentType.AGap
-    assert frags[0].len == 3
-    assert frags[1].fragment_type == FragmentType.Match
-    assert frags[1].len == 4
-    assert frags[2].fragment_type == FragmentType.AGap
-    assert frags[2].len == 3
+    expected_fragments = [
+        AlignmentFragment(fragment_type=FragmentType.AGap, sa_start=0, sb_start=0, len=3),
+        AlignmentFragment(fragment_type=FragmentType.Match, sa_start=0, sb_start=3, len=4),
+        AlignmentFragment(fragment_type=FragmentType.AGap, sa_start=4, sb_start=7, len=3),
+    ]
+    assert aln.fragments == expected_fragments
 
     assert aln.score == -2
