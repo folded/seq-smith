@@ -1025,6 +1025,8 @@ impl PartialOrd for Candidate {
 fn _top_k_ungapped_local_align_core(
     params: UngappedAlignmentParams,
     k: usize,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
 ) -> PyResult<Vec<Alignment>> {
     let sa_len = params.sa.len();
     let sb_len = params.sb.len();
@@ -1098,19 +1100,18 @@ fn _top_k_ungapped_local_align_core(
 
              let mut overlap = false;
              for prev in &alignments {
-                 let prev_frag = &prev.fragments[0]; // Ungapped has 1 fragment
-                 let p_sa_start = prev_frag.sa_start as usize - 1; // 0-indexed
-                 let p_sa_end = p_sa_start + prev_frag.len as usize;
-                 let p_sb_start = prev_frag.sb_start as usize - 1;
-                 let p_sb_end = p_sb_start + prev_frag.len as usize;
+                 let p_sa_start = (prev.fragments[0].sa_start - 1) as usize; // 0-indexed
+                 let p_sb_start = (prev.fragments[0].sb_start - 1) as usize; // 0-indexed
+                 let p_sa_end = p_sa_start + prev.fragments[0].len as usize;
+                 let p_sb_end = p_sb_start + prev.fragments[0].len as usize;
 
                  // Overlap in A?
-                 if candidate.sa_start < p_sa_end && sa_end > p_sa_start {
+                 if filter_overlap_a && candidate.sa_start < p_sa_end && sa_end > p_sa_start {
                      overlap = true;
                      break;
                  }
                  // Overlap in B?
-                 if candidate.sb_start < p_sb_end && sb_end > p_sb_start {
+                 if filter_overlap_b && candidate.sb_start < p_sb_end && sb_end > p_sb_start {
                      overlap = true;
                      break;
                  }
@@ -1165,12 +1166,15 @@ fn _top_k_ungapped_local_align_core(
 ///     list[Alignment]: List of top-k non-overlapping alignments.
 #[gen_stub_pyfunction]
 #[pyfunction]
+#[pyo3(signature = (seqa, seqb, score_matrix, k, filter_overlap_a=true, filter_overlap_b=true))]
 fn top_k_ungapped_local_align<'py>(
     py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
     seqb: &Bound<'py, PyBytes>,
     score_matrix: PyReadonlyArray2<i32>,
     k: usize,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
 ) -> PyResult<Vec<Alignment>> {
     let seqa = seqa.as_bytes().to_vec();
     let seqb = seqb.as_bytes().to_vec();
@@ -1184,6 +1188,8 @@ fn top_k_ungapped_local_align<'py>(
                 &score_matrix,
             )?,
             k,
+            filter_overlap_a,
+            filter_overlap_b,
         )
     })
 }
@@ -1201,7 +1207,7 @@ fn top_k_ungapped_local_align<'py>(
 ///     list[list[Alignment]]: List of alignment lists.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (seqa, seqbs, score_matrix, k, num_threads=None))]
+#[pyo3(signature = (seqa, seqbs, score_matrix, k, num_threads=None, filter_overlap_a=true, filter_overlap_b=true))]
 fn top_k_ungapped_local_align_many<'py>(
     py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
@@ -1209,6 +1215,8 @@ fn top_k_ungapped_local_align_many<'py>(
     score_matrix: PyReadonlyArray2<i32>,
     k: usize,
     num_threads: Option<usize>,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
 ) -> PyResult<Vec<Vec<Alignment>>> {
     let seqa = seqa.as_bytes().to_vec();
     let seqbs: Vec<Vec<u8>> = seqbs.iter().map(|s| s.as_bytes().to_vec()).collect();
@@ -1231,6 +1239,8 @@ fn top_k_ungapped_local_align_many<'py>(
                             &score_matrix,
                         )?,
                         k,
+                        filter_overlap_a,
+                        filter_overlap_b,
                     )
                 })
                 .collect()

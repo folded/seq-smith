@@ -122,6 +122,8 @@ def top_k_ungapped_local_align(
     seqb: bytes,
     score_matrix: npt.NDArray[np.int32],
     k: int,
+    filter_overlap_a: bool = True,
+    filter_overlap_b: bool = True,
 ) -> list[Alignment]: ...
 def top_k_ungapped_local_align_many(
     seqa: bytes,
@@ -129,4 +131,6 @@ def top_k_ungapped_local_align_many(
     score_matrix: npt.NDArray[np.int32],
     k: int,
     num_threads: int | None = None,
+    filter_overlap_a: bool = True,
+    filter_overlap_b: bool = True,
 ) -> list[list[Alignment]]: ...
