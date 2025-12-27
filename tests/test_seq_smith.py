@@ -3,6 +3,7 @@ import pytest
 from conftest import AlignmentData
 
 from seq_smith import (
+    AlignmentFragment,
     FragmentType,
     encode,
     format_alignment_ascii,
