@@ -502,8 +502,26 @@ def test_top_k_ungapped_simple() -> None:
     assert alignments[1].score == 8
 
     starts = sorted([(a.fragments[0].sa_start, a.fragments[0].sb_start) for a in alignments])
-    assert starts[0] == (1, 1)  # 1-based index in fragments
-    assert starts[1] == (9, 9)
+    assert starts[0] == (0, 0)
+    assert starts[1] == (8, 8)
+
+
+def test_top_k_ungapped_overlap() -> None:
+    # Use custom alphabet to support Z/W if needed, or just use ACGT
+    alphabet = "ACGT"
+    seqa = encode("AAAATTTTCCCCAAAATTTTCCCCAAAATTTTCCCC", alphabet)
+    seqb = encode("AAAAGGGGCCCC", alphabet)
+
+    # matrix: match=2, mismatch=-5
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    alignments = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=5, filter_overlap_b=False)
+
+    assert len(alignments) == 5  # 6 total alignments, but k=5
+    assert all(a.score == 8 for a in alignments)
+    starts = sorted([(a.fragments[0].sa_start, a.fragments[0].sb_start) for a in alignments])
+    for c, r in starts:
+        assert seqa[c : c + 4] == seqb[r : r + 4]
 
 
 def test_top_k_ungapped_overlapping_candidates(common_data: AlignmentData) -> None:
