@@ -407,12 +407,10 @@ fn traceback(
                 let mut count = 0;
                 loop {
                     // Statistics calculation
-                    let residue_a = params.sa[s_col as usize];
-                    let residue_b = params.sb[s_row as usize];
-                    if residue_a == residue_b {
+                    if params.sa[s_col as usize] == params.sb[s_row as usize] {
                         stats.num_exact_matches += 1;
                     } else {
-                        let score = params.match_score(residue_a as usize, residue_b as usize);
+                        let score = params.match_score(s_row as usize, s_col as usize);
                         if score > 0 {
                             stats.num_positive_mismatches += 1;
                         } else {
@@ -1098,8 +1096,8 @@ fn _top_k_ungapped_local_align_core(
             let sb_end = candidate.sb_start + candidate.len;
 
             let overlap = alignments.iter().any(|prev| {
-                let p_sa_start = (prev.fragments[0].sa_start - 1) as usize; // 0-indexed
-                let p_sb_start = (prev.fragments[0].sb_start - 1) as usize; // 0-indexed
+                let p_sa_start = prev.fragments[0].sa_start as usize;
+                let p_sb_start = prev.fragments[0].sb_start as usize;
                 let p_sa_end = p_sa_start + prev.fragments[0].len as usize;
                 let p_sb_end = p_sb_start + prev.fragments[0].len as usize;
 
@@ -1119,25 +1117,22 @@ fn _top_k_ungapped_local_align_core(
                 for i in 0..candidate.len {
                     let r = candidate.sb_start + i;
                     let c = candidate.sa_start + i;
-                    let val = params.match_score(c, r);
-                    if params.sa[c] == params.sb[r] {
+                    if params.sb[r] == params.sa[c] {
                         stats.num_exact_matches += 1;
-                    } else if val > 0 {
+                    } else if params.match_score(r, c) > 0 {
                         stats.num_positive_mismatches += 1;
                     } else {
                         stats.num_negative_mismatches += 1;
                     }
                 }
 
-                let frag = AlignmentFragment {
-                    fragment_type: FragmentType::Match,
-                    sa_start: (candidate.sa_start + 1) as i32,
-                    sb_start: (candidate.sb_start + 1) as i32,
-                    len: candidate.len as i32,
-                };
-
                 alignments.push(Alignment {
-                    fragments: vec![frag],
+                    fragments: vec![AlignmentFragment {
+                        fragment_type: FragmentType::Match,
+                        sa_start: candidate.sa_start as i32,
+                        sb_start: candidate.sb_start as i32,
+                        len: candidate.len as i32,
+                    }],
                     score: candidate.score,
                     stats: stats,
                 });
