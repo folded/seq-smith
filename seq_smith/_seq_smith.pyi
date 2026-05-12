@@ -132,6 +132,7 @@ def top_k_ungapped_local_align_kmer(
     k: int,
     kmer_size: int,
     max_hits_per_kmer: int,
+    min_kmer_hits_per_diagonal: int = 1,
     filter_overlap_a: bool = True,
     filter_overlap_b: bool = True,
 ) -> list[Alignment]: ...

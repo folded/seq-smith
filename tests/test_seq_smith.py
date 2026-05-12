@@ -729,3 +729,60 @@ def test_top_k_ungapped_kmer_max_hits_skips_low_complexity() -> None:
         seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=0,
     )
     assert capped_alignments == []
+
+
+def test_top_k_ungapped_kmer_min_hits_per_diagonal_filters() -> None:
+    """`min_kmer_hits_per_diagonal` thresholds out low-hit-count diagonals.
+
+    Within an HSP of length L over `kmer_size` k, the diagonal accumulates
+    L - k + 1 hits.  Choosing a threshold above this drops the HSP, while a
+    threshold at or below it keeps it.
+    """
+    alphabet = "ACGT"
+    # Single perfect HSP of length 6 on the main diagonal: 6 - 3 + 1 = 4 hits.
+    seqa = encode("AAAAAA", alphabet)
+    seqb = encode("AAAAAA", alphabet)
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+
+    kept = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        min_kmer_hits_per_diagonal=4,
+    )
+    assert len(kept) == 1
+    assert kept[0].score == 6
+
+    dropped = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        min_kmer_hits_per_diagonal=5,
+    )
+    assert dropped == []
+
+
+def test_top_k_ungapped_kmer_min_hits_zero_falls_back_to_exhaustive() -> None:
+    """`min_kmer_hits_per_diagonal=0` bypasses k-mer seeding entirely.
+
+    The function must then return exactly what `top_k_ungapped_local_align`
+    returns -- including HSPs whose match runs are too short to seed under
+    the given `kmer_size`.
+    """
+    alphabet = "ACGT"
+    rng = np.random.default_rng(7)
+    seqa = bytes(rng.integers(0, 4, size=200, dtype=np.uint8))
+    seqb = bytes(rng.integers(0, 4, size=180, dtype=np.uint8))
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+
+    full = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=10)
+    fallback = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=10, kmer_size=5, max_hits_per_kmer=100,
+        min_kmer_hits_per_diagonal=0,
+    )
+
+    full_sig = [
+        (a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len)
+        for a in full
+    ]
+    fallback_sig = [
+        (a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len)
+        for a in fallback
+    ]
+    assert fallback_sig == full_sig

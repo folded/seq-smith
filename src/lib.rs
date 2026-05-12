@@ -6,7 +6,7 @@ use pyo3::wrap_pyfunction;
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
 use rayon::prelude::*;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap};
 
 /// Represents the type of an alignment fragment.
 #[gen_stub_pyclass_enum]
@@ -1197,6 +1197,7 @@ fn _top_k_ungapped_local_align_kmer_core(
     k: usize,
     kmer_size: usize,
     max_hits_per_kmer: usize,
+    min_kmer_hits_per_diagonal: usize,
     filter_overlap_a: bool,
     filter_overlap_b: bool,
 ) -> PyResult<Vec<Alignment>> {
@@ -1204,6 +1205,16 @@ fn _top_k_ungapped_local_align_kmer_core(
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "kmer_size must be in [1, 8]",
         ));
+    }
+
+    // `min_kmer_hits_per_diagonal == 0` is the escape hatch: skip the k-mer
+    // pass entirely and fall back to the exhaustive all-diagonals scan.  This
+    // gives callers a single entry point that can degrade gracefully when the
+    // k-mer seeding is unsafe (very short sequences, very small alphabets, or
+    // when the caller cares about HSPs whose match runs are all shorter than
+    // `kmer_size`).
+    if min_kmer_hits_per_diagonal == 0 {
+        return _top_k_ungapped_local_align_core(params, k, filter_overlap_a, filter_overlap_b);
     }
 
     let sa_len = params.sa.len();
@@ -1233,9 +1244,17 @@ fn _top_k_ungapped_local_align_kmer_core(
         }
     }
 
-    // Collect the set of diagonals that have at least one k-mer hit.
-    // diag = sa_pos - sb_pos, range [-(sb_len-1), sa_len-1].
-    let mut hit_diagonals: HashSet<i64> = HashSet::new();
+    // Count k-mer hits per diagonal.  Diagonals are indexed as
+    // `diag_idx = sa_pos - sb_pos + (sb_len - 1)`, mapping the
+    // [-(sb_len-1), sa_len-1] range to [0, sa_len + sb_len - 2].
+    //
+    // We use a dense Vec instead of a HashMap: at typical text-alphabet
+    // densities most diagonals see >=1 hit, so the table is mostly populated
+    // and HashMap overhead dominates.  Memory is 4 * (n + m - 1) bytes,
+    // ~580 KB even at n = m = 73K.
+    let num_diagonals = sa_len + sb_len - 1;
+    let diag_offset = (sb_len - 1) as i64;
+    let mut hits_per_diagonal: Vec<u32> = vec![0; num_diagonals];
     {
         let mut rolling: u64 = 0;
         for (i, &byte) in params.sb.iter().enumerate() {
@@ -1249,16 +1268,26 @@ fn _top_k_ungapped_local_align_kmer_core(
                         continue;
                     }
                     for &sa_pos in positions {
-                        let diag = (sa_pos as i64) - sb_pos;
-                        hit_diagonals.insert(diag);
+                        let diag_idx = ((sa_pos as i64) - sb_pos + diag_offset) as usize;
+                        hits_per_diagonal[diag_idx] += 1;
                     }
                 }
             }
         }
     }
 
+    // Per-diagonal hit count is a lower bound on the SW score reachable on
+    // that diagonal: a match-run of length L deposits L - kmer_size + 1 hits,
+    // so thresholding "hits >= T" filters out diagonals whose best possible
+    // ungapped HSP score cannot exceed a small constant.  See the
+    // `min_kmer_hits_per_diagonal` arg on the public Python function.
+    let min_hits = min_kmer_hits_per_diagonal as u32;
     let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
-    for &diag in &hit_diagonals {
+    for (diag_idx, &count) in hits_per_diagonal.iter().enumerate() {
+        if count < min_hits {
+            continue;
+        }
+        let diag = (diag_idx as i64) - diag_offset;
         let (start_row, start_col) = if diag >= 0 {
             (0usize, diag as usize)
         } else {
@@ -1389,6 +1418,12 @@ fn top_k_ungapped_local_align_many<'py>(
 ///     max_hits_per_kmer (int): Skip k-mers that appear more than this many times in
 ///         `seqa`; protects against quadratic blowup on low-complexity stretches
 ///         (long runs of spaces, common short fragments, etc.).
+///     min_kmer_hits_per_diagonal (int): Require a diagonal to accumulate at least
+///         this many k-mer hits before running the extension scan on it.  A
+///         match-run of length `L` deposits `L - kmer_size + 1` hits on its
+///         diagonal, so this is effectively a per-diagonal score-floor pre-filter.
+///         Defaults to 1 (any diagonal with a hit is extended).  Set to 0 to
+///         disable k-mer seeding entirely and fall back to the exhaustive scan.
 ///     filter_overlap_a (bool): Drop later HSPs that overlap an accepted HSP on A.
 ///     filter_overlap_b (bool): Drop later HSPs that overlap an accepted HSP on B.
 ///
@@ -1396,7 +1431,7 @@ fn top_k_ungapped_local_align_many<'py>(
 ///     list[Alignment]: Up to `k` non-overlapping alignments, in descending score order.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (seqa, seqb, score_matrix, k, kmer_size, max_hits_per_kmer, filter_overlap_a=true, filter_overlap_b=true))]
+#[pyo3(signature = (seqa, seqb, score_matrix, k, kmer_size, max_hits_per_kmer, min_kmer_hits_per_diagonal=1, filter_overlap_a=true, filter_overlap_b=true))]
 fn top_k_ungapped_local_align_kmer<'py>(
     py: Python<'py>,
     seqa: &Bound<'py, PyBytes>,
@@ -1405,6 +1440,7 @@ fn top_k_ungapped_local_align_kmer<'py>(
     k: usize,
     kmer_size: usize,
     max_hits_per_kmer: usize,
+    min_kmer_hits_per_diagonal: usize,
     filter_overlap_a: bool,
     filter_overlap_b: bool,
 ) -> PyResult<Vec<Alignment>> {
@@ -1418,6 +1454,7 @@ fn top_k_ungapped_local_align_kmer<'py>(
             k,
             kmer_size,
             max_hits_per_kmer,
+            min_kmer_hits_per_diagonal,
             filter_overlap_a,
             filter_overlap_b,
         )
