@@ -731,35 +731,36 @@ def test_top_k_ungapped_kmer_max_hits_skips_low_complexity() -> None:
     assert capped_alignments == []
 
 
-def test_top_k_ungapped_kmer_min_hits_per_diagonal_filters() -> None:
-    """`min_kmer_hits_per_diagonal` thresholds out low-hit-count diagonals.
+def test_top_k_ungapped_kmer_min_hits_per_span_filters() -> None:
+    """`min_kmer_hits_per_span` thresholds out low-hit-count spans.
 
-    Within an HSP of length L over `kmer_size` k, the diagonal accumulates
-    L - k + 1 hits.  Choosing a threshold above this drops the HSP, while a
+    Within an HSP of length L over `kmer_size` k, the span accumulates
+    L - k + 1 hits.  Choosing a threshold above this drops the span, while a
     threshold at or below it keeps it.
     """
     alphabet = "ACGT"
-    # Single perfect HSP of length 6 on the main diagonal: 6 - 3 + 1 = 4 hits.
+    # Single perfect HSP of length 6 on the main diagonal: 6 - 3 + 1 = 4 hits,
+    # all in one span (adjacent positions, so well under max_hit_gap).
     seqa = encode("AAAAAA", alphabet)
     seqb = encode("AAAAAA", alphabet)
     score_matrix = make_score_matrix(alphabet, 1, -1)
 
     kept = top_k_ungapped_local_align_kmer(
         seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
-        min_kmer_hits_per_diagonal=4,
+        min_kmer_hits_per_span=4,
     )
     assert len(kept) == 1
     assert kept[0].score == 6
 
     dropped = top_k_ungapped_local_align_kmer(
         seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
-        min_kmer_hits_per_diagonal=5,
+        min_kmer_hits_per_span=5,
     )
     assert dropped == []
 
 
 def test_top_k_ungapped_kmer_min_hits_zero_falls_back_to_exhaustive() -> None:
-    """`min_kmer_hits_per_diagonal=0` bypasses k-mer seeding entirely.
+    """`min_kmer_hits_per_span=0` bypasses k-mer seeding entirely.
 
     The function must then return exactly what `top_k_ungapped_local_align`
     returns -- including HSPs whose match runs are too short to seed under
@@ -774,7 +775,7 @@ def test_top_k_ungapped_kmer_min_hits_zero_falls_back_to_exhaustive() -> None:
     full = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=10)
     fallback = top_k_ungapped_local_align_kmer(
         seqa, seqb, score_matrix, k=10, kmer_size=5, max_hits_per_kmer=100,
-        min_kmer_hits_per_diagonal=0,
+        min_kmer_hits_per_span=0,
     )
 
     full_sig = [
