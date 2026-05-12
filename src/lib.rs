@@ -6,7 +6,7 @@ use pyo3::wrap_pyfunction;
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
 use rayon::prelude::*;
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// Represents the type of an alignment fragment.
 #[gen_stub_pyclass_enum]
@@ -1008,85 +1008,88 @@ impl PartialOrd for Candidate {
     }
 }
 
-fn _top_k_ungapped_local_align_core(
-    params: UngappedAlignmentParams,
+#[inline]
+fn push_candidate(
+    candidates: &mut BinaryHeap<Candidate>,
+    score: i32,
+    sa_start: usize,
+    sb_start: usize,
+    len: usize,
+) {
+    if score > 0 {
+        candidates.push(Candidate {
+            score,
+            sa_start,
+            sb_start,
+            len,
+        });
+    }
+}
+
+// Smith-Waterman-style positive-segment scan along a single diagonal of the
+// (sb x sa) grid, pushing every positive HSP peak it finds into `candidates`.
+// The diagonal starts at (start_row, start_col) and runs for `max_len` cells.
+#[inline]
+fn process_diagonal_into_candidates(
+    params: &UngappedAlignmentParams,
+    candidates: &mut BinaryHeap<Candidate>,
+    start_row: usize,
+    start_col: usize,
+    max_len: usize,
+) {
+    let mut curr_score: i32 = 0;
+    let mut segment_start_idx: usize = 0; // index along diagonal where current positive segment started
+    let mut peak_score: i32 = 0;
+    let mut peak_idx: usize = 0; // index along diagonal where peak occurred
+
+    for i in 0..max_len {
+        let row = start_row + i;
+        let col = start_col + i;
+        let val = params.match_score(row, col);
+
+        if curr_score == 0 && val <= 0 {
+            continue;
+        }
+        if curr_score == 0 {
+            segment_start_idx = i;
+        }
+
+        curr_score += val;
+
+        if curr_score <= 0 {
+            push_candidate(
+                candidates,
+                peak_score,
+                start_col + segment_start_idx,
+                start_row + segment_start_idx,
+                peak_idx - segment_start_idx + 1,
+            );
+            curr_score = 0;
+            peak_score = 0;
+        } else if curr_score > peak_score {
+            peak_score = curr_score;
+            peak_idx = i;
+        }
+    }
+    push_candidate(
+        candidates,
+        peak_score,
+        start_col + segment_start_idx,
+        start_row + segment_start_idx,
+        peak_idx - segment_start_idx + 1,
+    );
+}
+
+// Pop top-k highest-scoring candidates from the heap, dropping any that overlap
+// an already-accepted candidate on the A and/or B axis.  Returns Alignments in
+// score-descending order.
+fn select_top_k_with_overlap_filter(
+    params: &UngappedAlignmentParams,
+    mut candidates: BinaryHeap<Candidate>,
     k: usize,
     filter_overlap_a: bool,
     filter_overlap_b: bool,
-) -> PyResult<Vec<Alignment>> {
-    let sa_len = params.sa.len();
-    let sb_len = params.sb.len();
-
-    let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
-
-    let mut add_candidate = |score: i32, sa_start: usize, sb_start: usize, len: usize| {
-        if score > 0 {
-            candidates.push(Candidate {
-                score,
-                sa_start,
-                sb_start,
-                len,
-            });
-        }
-    };
-
-    let mut process_diagonal = |start_row: usize, start_col: usize, max_len: usize| {
-        let mut curr_score = 0;
-        let mut segment_start_idx = 0; // index along diagonal where current positive segment started
-        let mut peak_score = 0;
-        let mut peak_idx = 0; // index along diagonal where peak occurred
-
-        for i in 0..max_len {
-            let row = start_row + i;
-            let col = start_col + i;
-            let val = params.match_score(row, col);
-
-            if curr_score == 0 && val <= 0 {
-                continue;
-            }
-            if curr_score == 0 {
-                segment_start_idx = i;
-            }
-
-            curr_score += val;
-
-            if curr_score <= 0 {
-                add_candidate(
-                    peak_score,
-                    start_col + segment_start_idx,
-                    start_row + segment_start_idx,
-                    peak_idx - segment_start_idx + 1,
-                );
-                curr_score = 0;
-                peak_score = 0;
-            } else {
-                if curr_score > peak_score {
-                    peak_score = curr_score;
-                    peak_idx = i;
-                }
-            }
-        }
-        add_candidate(
-            peak_score,
-            start_col + segment_start_idx,
-            start_row + segment_start_idx,
-            peak_idx - segment_start_idx + 1,
-        );
-    };
-
-    // Diagonals starting at first row (row=0, col=0..sa_len)
-    for start_col in 0..sa_len {
-        let max_len = std::cmp::min(sa_len - start_col, sb_len);
-        process_diagonal(0, start_col, max_len);
-    }
-
-    // Diagonals starting at first column (row=1..sb_len, col=0)
-    for start_row in 1..sb_len {
-        let max_len = std::cmp::min(sa_len, sb_len - start_row);
-        process_diagonal(start_row, 0, max_len);
-    }
-
-    // Select top k non-overlapping
+) -> Vec<Alignment> {
     let mut alignments: Vec<Alignment> = Vec::with_capacity(k);
 
     while alignments.len() < k {
@@ -1134,7 +1137,7 @@ fn _top_k_ungapped_local_align_core(
                         len: candidate.len as i32,
                     }],
                     score: candidate.score,
-                    stats: stats,
+                    stats,
                 });
             }
         } else {
@@ -1142,7 +1145,136 @@ fn _top_k_ungapped_local_align_core(
         }
     }
 
-    Ok(alignments)
+    alignments
+}
+
+fn _top_k_ungapped_local_align_core(
+    params: UngappedAlignmentParams,
+    k: usize,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
+) -> PyResult<Vec<Alignment>> {
+    let sa_len = params.sa.len();
+    let sb_len = params.sb.len();
+
+    let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
+
+    // Diagonals starting at first row (row=0, col=0..sa_len)
+    for start_col in 0..sa_len {
+        let max_len = std::cmp::min(sa_len - start_col, sb_len);
+        process_diagonal_into_candidates(&params, &mut candidates, 0, start_col, max_len);
+    }
+
+    // Diagonals starting at first column (row=1..sb_len, col=0)
+    for start_row in 1..sb_len {
+        let max_len = std::cmp::min(sa_len, sb_len - start_row);
+        process_diagonal_into_candidates(&params, &mut candidates, start_row, 0, max_len);
+    }
+
+    Ok(select_top_k_with_overlap_filter(
+        &params,
+        candidates,
+        k,
+        filter_overlap_a,
+        filter_overlap_b,
+    ))
+}
+
+// K-mer-seeded variant of `_top_k_ungapped_local_align_core`.  Builds an exact-
+// match k-mer index of `seqa`, finds every k-mer hit between `seqa` and `seqb`,
+// and runs the diagonal positive-segment scan only on diagonals that contain
+// at least one such hit.  Skips diagonals where no k-mer of length `kmer_size`
+// matches between the two sequences, which is the source of the speedup over
+// the all-diagonals scan.
+//
+// Correctness: an HSP on a diagonal is found iff at least one window of
+// `kmer_size` consecutive exact-match bytes lies on that diagonal between the
+// two sequences.  HSPs whose match runs are all strictly shorter than
+// `kmer_size` are missed.  For text alphabets and `kmer_size <= 5`, this only
+// occurs at very small HSP scores.
+fn _top_k_ungapped_local_align_kmer_core(
+    params: UngappedAlignmentParams,
+    k: usize,
+    kmer_size: usize,
+    max_hits_per_kmer: usize,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
+) -> PyResult<Vec<Alignment>> {
+    if kmer_size == 0 || kmer_size > 8 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "kmer_size must be in [1, 8]",
+        ));
+    }
+
+    let sa_len = params.sa.len();
+    let sb_len = params.sb.len();
+
+    if sa_len < kmer_size || sb_len < kmer_size {
+        return Ok(Vec::new());
+    }
+
+    // Pack a k-mer of size <= 8 into a u64.  The mask isolates the active bytes.
+    let kmer_mask: u64 = if kmer_size == 8 {
+        u64::MAX
+    } else {
+        (1u64 << (8 * kmer_size)) - 1
+    };
+
+    // K-mer index of seqa: rolling-hashed k-mer -> positions in sa.
+    let mut kmer_index: HashMap<u64, Vec<u32>> = HashMap::new();
+    {
+        let mut rolling: u64 = 0;
+        for (i, &byte) in params.sa.iter().enumerate() {
+            rolling = ((rolling << 8) | (byte as u64)) & kmer_mask;
+            if i + 1 >= kmer_size {
+                let pos = (i + 1 - kmer_size) as u32;
+                kmer_index.entry(rolling).or_default().push(pos);
+            }
+        }
+    }
+
+    // Collect the set of diagonals that have at least one k-mer hit.
+    // diag = sa_pos - sb_pos, range [-(sb_len-1), sa_len-1].
+    let mut hit_diagonals: HashSet<i64> = HashSet::new();
+    {
+        let mut rolling: u64 = 0;
+        for (i, &byte) in params.sb.iter().enumerate() {
+            rolling = ((rolling << 8) | (byte as u64)) & kmer_mask;
+            if i + 1 >= kmer_size {
+                let sb_pos = (i + 1 - kmer_size) as i64;
+                if let Some(positions) = kmer_index.get(&rolling) {
+                    // Cap on hits-per-kmer protects against quadratic blowup
+                    // on low-complexity stretches (e.g. long runs of spaces).
+                    if positions.len() > max_hits_per_kmer {
+                        continue;
+                    }
+                    for &sa_pos in positions {
+                        let diag = (sa_pos as i64) - sb_pos;
+                        hit_diagonals.insert(diag);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
+    for &diag in &hit_diagonals {
+        let (start_row, start_col) = if diag >= 0 {
+            (0usize, diag as usize)
+        } else {
+            ((-diag) as usize, 0usize)
+        };
+        let max_len = std::cmp::min(sa_len - start_col, sb_len - start_row);
+        process_diagonal_into_candidates(&params, &mut candidates, start_row, start_col, max_len);
+    }
+
+    Ok(select_top_k_with_overlap_filter(
+        &params,
+        candidates,
+        k,
+        filter_overlap_a,
+        filter_overlap_b,
+    ))
 }
 
 /// Finds the top-k non-overlapping ungapped local alignments (HSPs).
@@ -1236,6 +1368,62 @@ fn top_k_ungapped_local_align_many<'py>(
     })
 }
 
+/// Finds the top-k non-overlapping ungapped local alignments (HSPs) using k-mer seeding.
+///
+/// Functionally similar to `top_k_ungapped_local_align` but much faster on long inputs
+/// over moderate-sized alphabets: HSPs are sought only on diagonals of the n*m grid that
+/// contain at least one exact k-mer match between `seqa` and `seqb`, instead of scanning
+/// every diagonal.
+///
+/// Correctness: an HSP is found iff at least one window of `kmer_size` consecutive
+/// exact-match bytes lies on its diagonal between the two sequences.  HSPs whose match
+/// runs are all strictly shorter than `kmer_size` are missed.  For text alphabets and
+/// `kmer_size <= 5`, this only occurs at very small HSP scores.
+///
+/// Args:
+///     seqa (bytes): The first sequence.
+///     seqb (bytes): The second sequence.
+///     score_matrix (numpy.ndarray): Scoring matrix.
+///     k (int): Maximum number of alignments to return.
+///     kmer_size (int): Seed length in bytes; must be in [1, 8].
+///     max_hits_per_kmer (int): Skip k-mers that appear more than this many times in
+///         `seqa`; protects against quadratic blowup on low-complexity stretches
+///         (long runs of spaces, common short fragments, etc.).
+///     filter_overlap_a (bool): Drop later HSPs that overlap an accepted HSP on A.
+///     filter_overlap_b (bool): Drop later HSPs that overlap an accepted HSP on B.
+///
+/// Returns:
+///     list[Alignment]: Up to `k` non-overlapping alignments, in descending score order.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(signature = (seqa, seqb, score_matrix, k, kmer_size, max_hits_per_kmer, filter_overlap_a=true, filter_overlap_b=true))]
+fn top_k_ungapped_local_align_kmer<'py>(
+    py: Python<'py>,
+    seqa: &Bound<'py, PyBytes>,
+    seqb: &Bound<'py, PyBytes>,
+    score_matrix: PyReadonlyArray2<i32>,
+    k: usize,
+    kmer_size: usize,
+    max_hits_per_kmer: usize,
+    filter_overlap_a: bool,
+    filter_overlap_b: bool,
+) -> PyResult<Vec<Alignment>> {
+    let seqa = seqa.as_bytes().to_vec();
+    let seqb = seqb.as_bytes().to_vec();
+    let score_matrix = score_matrix.as_array().into_owned();
+
+    py.detach(move || {
+        _top_k_ungapped_local_align_kmer_core(
+            UngappedAlignmentParams::new(&seqa, &seqb, &score_matrix)?,
+            k,
+            kmer_size,
+            max_hits_per_kmer,
+            filter_overlap_a,
+            filter_overlap_b,
+        )
+    })
+}
+
 #[pymodule]
 fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(local_align))?;
@@ -1248,6 +1436,7 @@ fn _seq_smith(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(overlap_align_many))?;
     m.add_wrapped(wrap_pyfunction!(top_k_ungapped_local_align))?;
     m.add_wrapped(wrap_pyfunction!(top_k_ungapped_local_align_many))?;
+    m.add_wrapped(wrap_pyfunction!(top_k_ungapped_local_align_kmer))?;
     m.add_class::<Alignment>()?;
     m.add_class::<AlignmentFragment>()?;
     m.add_class::<FragmentType>()?;

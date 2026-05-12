@@ -11,6 +11,7 @@ from ._seq_smith import (
     overlap_align,
     overlap_align_many,
     top_k_ungapped_local_align,
+    top_k_ungapped_local_align_kmer,
     top_k_ungapped_local_align_many,
 )
 from .python_utils import decode, encode, format_alignment_ascii, generate_cigar, make_score_matrix
@@ -33,5 +34,6 @@ __all__ = [
     "overlap_align",
     "overlap_align_many",
     "top_k_ungapped_local_align",
+    "top_k_ungapped_local_align_kmer",
     "top_k_ungapped_local_align_many",
 ]
