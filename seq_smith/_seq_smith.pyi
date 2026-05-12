@@ -125,6 +125,18 @@ def top_k_ungapped_local_align(
     filter_overlap_a: bool = True,
     filter_overlap_b: bool = True,
 ) -> list[Alignment]: ...
+def top_k_ungapped_local_align_kmer(
+    seqa: bytes,
+    seqb: bytes,
+    score_matrix: npt.NDArray[np.int32],
+    k: int,
+    kmer_size: int,
+    max_hits_per_kmer: int,
+    max_hit_gap: int = 20,
+    min_kmer_hits_per_span: int = 1,
+    filter_overlap_a: bool = True,
+    filter_overlap_b: bool = True,
+) -> list[Alignment]: ...
 def top_k_ungapped_local_align_many(
     seqa: bytes,
     seqbs: Sequence[bytes],
