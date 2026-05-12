@@ -3,6 +3,7 @@ import pytest
 from conftest import AlignmentData
 
 from seq_smith import (
+    Alignment,
     AlignmentFragment,
     FragmentType,
     encode,
@@ -605,7 +606,12 @@ def test_top_k_ungapped_kmer_simple() -> None:
     score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
 
     alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=100,
     )
 
     assert len(alignments) == 2
@@ -626,13 +632,18 @@ def test_top_k_ungapped_kmer_matches_full_scan_random_dna() -> None:
 
     full = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=20)
     kmer = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=20, kmer_size=3, max_hits_per_kmer=10_000,
+        seqa,
+        seqb,
+        score_matrix,
+        k=20,
+        kmer_size=3,
+        max_hits_per_kmer=10_000,
     )
 
     # On a tiny 4-letter alphabet at k=3 the seeder is dense enough that we
     # expect every HSP scoring >= 5 to be caught.  Compare the top-scoring
     # HSPs above that floor.
-    def key(a) -> tuple[int, int, int]:
+    def key(a: Alignment) -> tuple[int, int, int]:
         return (-a.score, a.fragments[0].sa_start, a.fragments[0].sb_start)
 
     full_top = sorted([a for a in full if a.score >= 5], key=key)
@@ -650,8 +661,13 @@ def test_top_k_ungapped_kmer_overlap() -> None:
     score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
 
     alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5,
-        kmer_size=3, max_hits_per_kmer=100, filter_overlap_b=False,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=100,
+        filter_overlap_b=False,
     )
 
     assert len(alignments) == 5
@@ -669,7 +685,12 @@ def test_top_k_ungapped_kmer_limit() -> None:
     score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
 
     alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=2, kmer_size=2, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=2,
+        kmer_size=2,
+        max_hits_per_kmer=100,
     )
 
     assert len(alignments) == 2
@@ -686,11 +707,21 @@ def test_top_k_ungapped_kmer_invalid_kmer_size() -> None:
 
     with pytest.raises(ValueError, match="kmer_size"):
         top_k_ungapped_local_align_kmer(
-            seqa, seqb, score_matrix, k=1, kmer_size=0, max_hits_per_kmer=10,
+            seqa,
+            seqb,
+            score_matrix,
+            k=1,
+            kmer_size=0,
+            max_hits_per_kmer=10,
         )
     with pytest.raises(ValueError, match="kmer_size"):
         top_k_ungapped_local_align_kmer(
-            seqa, seqb, score_matrix, k=1, kmer_size=9, max_hits_per_kmer=10,
+            seqa,
+            seqb,
+            score_matrix,
+            k=1,
+            kmer_size=9,
+            max_hits_per_kmer=10,
         )
 
 
@@ -702,7 +733,12 @@ def test_top_k_ungapped_kmer_seqs_shorter_than_kmer() -> None:
     score_matrix = make_score_matrix(alphabet, 1, -1)
 
     alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=4, max_hits_per_kmer=10,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=4,
+        max_hits_per_kmer=10,
     )
     assert alignments == []
 
@@ -720,13 +756,23 @@ def test_top_k_ungapped_kmer_max_hits_skips_low_complexity() -> None:
     score_matrix = make_score_matrix(alphabet, 1, -1)
 
     full_alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=100,
     )
     assert len(full_alignments) >= 1
     assert full_alignments[0].score == 10
 
     capped_alignments = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=0,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=0,
     )
     assert capped_alignments == []
 
@@ -746,14 +792,24 @@ def test_top_k_ungapped_kmer_min_hits_per_span_filters() -> None:
     score_matrix = make_score_matrix(alphabet, 1, -1)
 
     kept = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=100,
         min_kmer_hits_per_span=4,
     )
     assert len(kept) == 1
     assert kept[0].score == 6
 
     dropped = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=5,
+        kmer_size=3,
+        max_hits_per_kmer=100,
         min_kmer_hits_per_span=5,
     )
     assert dropped == []
@@ -774,16 +830,15 @@ def test_top_k_ungapped_kmer_min_hits_zero_falls_back_to_exhaustive() -> None:
 
     full = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=10)
     fallback = top_k_ungapped_local_align_kmer(
-        seqa, seqb, score_matrix, k=10, kmer_size=5, max_hits_per_kmer=100,
+        seqa,
+        seqb,
+        score_matrix,
+        k=10,
+        kmer_size=5,
+        max_hits_per_kmer=100,
         min_kmer_hits_per_span=0,
     )
 
-    full_sig = [
-        (a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len)
-        for a in full
-    ]
-    fallback_sig = [
-        (a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len)
-        for a in fallback
-    ]
+    full_sig = [(a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len) for a in full]
+    fallback_sig = [(a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len) for a in fallback]
     assert fallback_sig == full_sig
