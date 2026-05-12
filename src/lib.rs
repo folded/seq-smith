@@ -1371,7 +1371,11 @@ fn _top_k_ungapped_local_align_kmer_core(
     let num_diagonals = sa_len + sb_len - 1;
     let diag_offset = (sb_len - 1) as i64;
     let mut open_spans: Vec<OpenSpan> = vec![
-        OpenSpan { count: 0, start_pos: 0, last_pos: 0 };
+        OpenSpan {
+            count: 0,
+            start_pos: 0,
+            last_pos: 0
+        };
         num_diagonals
     ];
     let mut closed_spans: Vec<ClosedSpan> = Vec::new();
