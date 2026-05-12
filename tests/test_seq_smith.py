@@ -14,6 +14,7 @@ from seq_smith import (
     make_score_matrix,
     overlap_align,
     top_k_ungapped_local_align,
+    top_k_ungapped_local_align_kmer,
     top_k_ungapped_local_align_many,
 )
 
@@ -589,3 +590,142 @@ def test_top_k_ungapped_many_simple() -> None:
     # So should be empty if score <= 0.
     # Our implementation returns empty if no positive peaks.
     assert len(alignments_list[1]) == 0
+
+
+# -------------------------------------------------------------------------
+# top_k_ungapped_local_align_kmer
+# -------------------------------------------------------------------------
+
+
+def test_top_k_ungapped_kmer_simple() -> None:
+    """K-mer seeding finds the same two HSPs as the all-diagonals scan."""
+    alphabet = "ACGT"
+    seqa = encode("AAAATTTTCCCC", alphabet)
+    seqb = encode("AAAAGGGGCCCC", alphabet)
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+    )
+
+    assert len(alignments) == 2
+    assert alignments[0].score == 8
+    assert alignments[1].score == 8
+    starts = sorted([(a.fragments[0].sa_start, a.fragments[0].sb_start) for a in alignments])
+    assert starts == [(0, 0), (8, 8)]
+
+
+def test_top_k_ungapped_kmer_matches_full_scan_random_dna() -> None:
+    """The k-mer seeder must agree with the all-diagonals scan on any input
+    where HSP score >= 8 (well above the floor where seed misses can occur)."""
+    rng = np.random.default_rng(42)
+    alphabet = "ACGT"
+    seqa = bytes(rng.integers(0, 4, size=400, dtype=np.uint8))
+    seqb = bytes(rng.integers(0, 4, size=350, dtype=np.uint8))
+    score_matrix = make_score_matrix(alphabet, match_score=1, mismatch_score=-1)
+
+    full = top_k_ungapped_local_align(seqa, seqb, score_matrix, k=20)
+    kmer = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=20, kmer_size=3, max_hits_per_kmer=10_000,
+    )
+
+    # On a tiny 4-letter alphabet at k=3 the seeder is dense enough that we
+    # expect every HSP scoring >= 5 to be caught.  Compare the top-scoring
+    # HSPs above that floor.
+    def key(a) -> tuple[int, int, int]:
+        return (-a.score, a.fragments[0].sa_start, a.fragments[0].sb_start)
+
+    full_top = sorted([a for a in full if a.score >= 5], key=key)
+    kmer_top = sorted([a for a in kmer if a.score >= 5], key=key)
+    assert [(a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len) for a in full_top] == [
+        (a.score, a.fragments[0].sa_start, a.fragments[0].sb_start, a.fragments[0].len) for a in kmer_top
+    ]
+
+
+def test_top_k_ungapped_kmer_overlap() -> None:
+    """Overlap filtering on B works the same as in the all-diagonals scan."""
+    alphabet = "ACGT"
+    seqa = encode("AAAATTTTCCCCAAAATTTTCCCCAAAATTTTCCCC", alphabet)
+    seqb = encode("AAAAGGGGCCCC", alphabet)
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5,
+        kmer_size=3, max_hits_per_kmer=100, filter_overlap_b=False,
+    )
+
+    assert len(alignments) == 5
+    assert all(a.score == 8 for a in alignments)
+    starts = sorted([(a.fragments[0].sa_start, a.fragments[0].sb_start) for a in alignments])
+    for c, r in starts:
+        assert seqa[c : c + 4] == seqb[r : r + 4]
+
+
+def test_top_k_ungapped_kmer_limit() -> None:
+    """Top-k truncation works the same as in the all-diagonals scan."""
+    alphabet = "ACGT"
+    seqa = encode("AATTCCTTGG", alphabet)
+    seqb = encode("AAGGCCGGGG", alphabet)
+    score_matrix = make_score_matrix(alphabet, match_score=2, mismatch_score=-5)
+
+    alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=2, kmer_size=2, max_hits_per_kmer=100,
+    )
+
+    assert len(alignments) == 2
+    assert alignments[0].score == 4
+    assert alignments[1].score == 4
+
+
+def test_top_k_ungapped_kmer_invalid_kmer_size() -> None:
+    """kmer_size must be in [1, 8]; outside that range raises ValueError."""
+    alphabet = "ACGT"
+    seqa = encode("ACGT", alphabet)
+    seqb = encode("ACGT", alphabet)
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+
+    with pytest.raises(ValueError, match="kmer_size"):
+        top_k_ungapped_local_align_kmer(
+            seqa, seqb, score_matrix, k=1, kmer_size=0, max_hits_per_kmer=10,
+        )
+    with pytest.raises(ValueError, match="kmer_size"):
+        top_k_ungapped_local_align_kmer(
+            seqa, seqb, score_matrix, k=1, kmer_size=9, max_hits_per_kmer=10,
+        )
+
+
+def test_top_k_ungapped_kmer_seqs_shorter_than_kmer() -> None:
+    """Sequences shorter than `kmer_size` produce no HSPs (no k-mer index)."""
+    alphabet = "ACGT"
+    seqa = encode("AC", alphabet)
+    seqb = encode("AC", alphabet)
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+
+    alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=4, max_hits_per_kmer=10,
+    )
+    assert alignments == []
+
+
+def test_top_k_ungapped_kmer_max_hits_skips_low_complexity() -> None:
+    """A k-mer occurring more than `max_hits_per_kmer` times in seqa is skipped.
+
+    With ``max_hits_per_kmer=0`` no k-mer hit is ever followed up, so even an
+    identity pair returns no HSPs.  This is the knob that protects against
+    quadratic blowup on long runs of the same character.
+    """
+    alphabet = "ACGT"
+    seqa = encode("AAAAAAAAAA", alphabet)
+    seqb = encode("AAAAAAAAAA", alphabet)
+    score_matrix = make_score_matrix(alphabet, 1, -1)
+
+    full_alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=100,
+    )
+    assert len(full_alignments) >= 1
+    assert full_alignments[0].score == 10
+
+    capped_alignments = top_k_ungapped_local_align_kmer(
+        seqa, seqb, score_matrix, k=5, kmer_size=3, max_hits_per_kmer=0,
+    )
+    assert capped_alignments == []
